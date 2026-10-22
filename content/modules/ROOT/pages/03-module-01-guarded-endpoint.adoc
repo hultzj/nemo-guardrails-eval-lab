@@ -55,9 +55,9 @@ The configuration is a ConfigMap with two files: `config.yaml` (which rails, wit
 settings) and `rails.co` (Colang flows, NeMo's flow language). This lab uses only built-in
 flows, but the server refuses to start without a `rails.co`, so it holds a comment.
 
-[source,bash,role="execute"]
+[source,bash,role="execute",subs="attributes+"]
 ----
-NS=$(oc whoami)-guardrails
+NS=$(oc whoami){tenant_suffix}
 oc -n $NS apply -f - <<'EOF'
 apiVersion: v1
 kind: ConfigMap
@@ -70,8 +70,8 @@ data:
         regex_detection:
           input:
             patterns:
-              - '\b\d{3}-\d{2}-\d{4}\b'                 # US social security number
-              - '\b(?:\d{4}[- ]?){3}\d{4}\b'            # payment card number
+              - '\b\d\{3}-\d\{2}-\d\{4}\b'                 # US social security number
+              - '\b(?:\d\{4}[- ]?)\{3}\d\{4}\b'            # payment card number
               - '(?i)\b(password|api[_-]?key|token|secret)\b'
               - '(?i)\b(bomb|weapon|explosive)\b'
         sensitive_data_detection:

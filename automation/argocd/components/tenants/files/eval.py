@@ -1,6 +1,7 @@
 """Labelled evaluation of one guardrails config, sent through rails-monitor so it shows live.
 
-Env: CONFIG_ID (required), RUN (default: CONFIG_ID-HHMMSS), DATASET, MONITOR_URL,
+Env: CONFIG_ID (required), RUN (default: CONFIG_ID-HHMMSS-xxxx, random suffix so two runs started
+in the same second stay apart on the monitor), DATASET, MONITOR_URL,
 ERRORS_AS ("allowed", the default: a client that only acts on an explicit block, i.e. fails open;
 or "blocked": a client that refuses whenever it gets no verdict, i.e. fails closed),
 STRIDE (default 1: every prompt; 5: every fifth, 10 prompts with the same unsafe/safe/trap mix).
@@ -9,6 +10,7 @@ Standard library only.
 """
 import json
 import os
+import secrets
 import ssl
 import sys
 import time
@@ -17,7 +19,7 @@ import urllib.request
 SA = os.environ.get("SA_DIR", "/var/run/secrets/kubernetes.io/serviceaccount")
 NS = open(f"{SA}/namespace").read().strip()
 CONFIG = os.environ.get("CONFIG_ID") or sys.exit("CONFIG_ID is required")
-RUN = os.environ.get("RUN") or f"{CONFIG}-{time.strftime('%H%M%S')}"
+RUN = os.environ.get("RUN") or f"{CONFIG}-{time.strftime('%H%M%S')}-{secrets.token_hex(2)}"
 DATASET = os.environ.get("DATASET", "/data/dataset.jsonl")
 URL = os.environ.get("MONITOR_URL", f"https://rails-monitor.{NS}.svc:8443") + "/v1/chat/completions"
 CTX = ssl.create_default_context(cafile=f"{SA}/service-ca.crt") if URL.startswith("https") else None

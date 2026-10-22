@@ -84,5 +84,13 @@ class EvalTest(unittest.TestCase):
         self.assertEqual(Monitor.headers_seen[-1]["X-Eval-Errors-As"], "blocked")
 
 
+    def test_runs_started_together_get_distinct_ids(self):
+        env = dict(os.environ, SA_DIR=self.dir, DATASET=self.dataset, CONFIG_ID="same",
+                   MONITOR_URL=f"http://127.0.0.1:{self.srv.server_port}")
+        procs = [subprocess.Popen([sys.executable, EVAL], env=env, stdout=subprocess.PIPE, text=True) for _ in range(2)]
+        runs = {re.search(r"^run=(\S+)", p.communicate(timeout=60)[0], re.M).group(1) for p in procs}
+        self.assertEqual(len(runs), 2, runs)
+
+
 if __name__ == "__main__":
     unittest.main()

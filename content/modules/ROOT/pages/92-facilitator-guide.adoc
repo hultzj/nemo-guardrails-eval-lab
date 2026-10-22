@@ -46,12 +46,14 @@ From a cluster-admin shell in a checkout of this repository:
   If an existing account must be in the list anyway, name it in `lab.presenters`: `make users`
   never creates or resets it, and `make verify` skips the participant denial checks for it.
   Commit and push. Argo CD deploys from the remote, not from your checkout.
-. Create the participants' Keycloak accounts (`lab.users` minus `lab.presenters`) with a
-  password you choose. It is never stored in git:
+. Create the participants' Keycloak accounts (`lab.users` minus `lab.presenters`). Each gets
+  its own random password, printed once at the end and stored nowhere; hand every attendee only
+  their own line. A shared password would let any attendee log in as another and reach their
+  tenant. Re-run to reset everyone's password.
 +
 [source,bash]
 ----
-LAB_USER_PASSWORD='<choose one>' make -C automation users
+make -C automation users
 ----
 . Deploy:
 +
@@ -88,7 +90,7 @@ Terminal, and run the pre-flight from xref:02-details.adoc[Prerequisites and Env
 
 == Day of class
 
-* Share the Showroom URL (`oc -n {showroom_namespace} get route showroom`), the console URL, and the password.
+* Share the Showroom URL (`oc -n {showroom_namespace} get route showroom`) and the console URL with everyone; give each attendee their own username and password privately.
 * Presenter: run the lab as `presenter` with the live monitor on a second screen. Module 3's content-safety run is the moment to pause: the counters climb while the log scrolls.
 * Five participants evaluating at once share four parallel slots per safety-model replica; a content-safety run then takes up to about five minutes instead of two to three.
 * If a participant's monitor shows only `ERROR` verdicts, read its pod log pane first; the cause (a typo in a ConfigMap, a missing `rails.co`) is usually there.

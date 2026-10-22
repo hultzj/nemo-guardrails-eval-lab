@@ -6,9 +6,10 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 VALUES="$HERE/argocd/values.yaml"
 GITOPS_NS=${GITOPS_NS:-openshift-gitops}
 SHOWROOM_NS=${SHOWROOM_NS:-showroom}
-LAB_NS=${LAB_NS:-guardrails-lab-shared}
-SUFFIX=${SUFFIX:--guardrails}
-DECOY_NS=${DECOY_NS:-peer-demo$SUFFIX}
+value() { sed -n "/^lab:/,/^[^ #]/s/^  $1: *//p" "$VALUES"; }  # a scalar under lab: in values.yaml
+LAB_NS=${LAB_NS:-$(value namespace)}
+SUFFIX=${SUFFIX:-$(value tenantSuffix)}
+DECOY_NS=${DECOY_NS:-$(value decoyTenant)$SUFFIX}
 # The parent Application name; children are named <LAB_APP>-<component>.
 LAB_APP=${LAB_APP:-nemo-guardrails-eval-lab}
 USERS=${USERS-$(sed -n 's/^  users: \[\(.*\)\]/\1/p' "$VALUES" | tr -d ' ' | tr ',' ' ')}

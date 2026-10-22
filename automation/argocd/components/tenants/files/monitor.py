@@ -209,7 +209,11 @@ class Handler(BaseHTTPRequestHandler):
                 context=ctx(UPSTREAM, "service-ca.crt"), timeout=60)
             status, payload = up.status, up.read()
         except urllib.error.HTTPError as e:
-            status, payload = e.code, e.read()
+            status = e.code
+            try:
+                payload = e.read()
+            except Exception:  # a truncated error body is still an answer, and still an error
+                payload = json.dumps({"error": f"guardrails answered HTTP {e.code} with an unreadable body"}).encode()
         except Exception as e:
             status, payload = 502, json.dumps({"error": f"guardrails unreachable: {e}"}).encode()
         try:

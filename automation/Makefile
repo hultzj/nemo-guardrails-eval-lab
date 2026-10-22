@@ -11,7 +11,7 @@ REVISION ?= $(shell awk '/^gitops:/ {g = 1} g && $$1 == "revision:" {print $$2; 
 
 help:
 	@printf '%s\n' \
-	  '  make users       Create/reset the Keycloak users (needs LAB_USER_PASSWORD)' \
+	  '  make users       Create/reset the Keycloak users, one random password each (printed once)' \
 	  '  make bootstrap   Deploy the lab through OpenShift GitOps (clusters without an RHDP order)' \
 	  '  make status      Show sync and health of the lab Applications' \
 	  '  make verify      PASS/FAIL readiness checks for class' \

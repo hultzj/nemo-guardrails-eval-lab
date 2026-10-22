@@ -25,21 +25,32 @@ BLOCKED = {"choices": [{"message": {"content": "I'm sorry, I can't respond to th
                           "log": {"stats": {"input_rails_duration": 0.5}}}}
 
 
+NO_VERDICT = {"choices": [{"message": {"content": "Internal server error"}}], "guardrails": {"output_data": {}}}
+
+
 class Upstream(BaseHTTPRequestHandler):
-    """Stub guardrails server: answers every POST with a blocked verdict and remembers the body."""
+    """Stub guardrails server: the prompt picks the answer (default: blocked); remembers each body."""
     bodies = []
 
     def log_message(self, *args):
         pass
 
     def do_POST(self):
-        Upstream.bodies.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
-        data = json.dumps(BLOCKED).encode()
-        self.send_response(200)
+        body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        Upstream.bodies.append(body)
+        prompt = ((body.get("messages") or [{}])[-1]).get("content", "")
+        status, data, extra = 200, json.dumps(BLOCKED).encode(), 0
+        if prompt == "no-verdict":
+            data = json.dumps(NO_VERDICT).encode()
+        elif prompt == "trunc-500":  # an error whose body is cut short
+            status, data, extra = 500, b'{"error": "boom', 500
+        self.send_response(status)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Content-Length", str(len(data) + extra))
         self.end_headers()
         self.wfile.write(data)
+        if extra:
+            self.close_connection = True
 
 
 class KubeAPI(BaseHTTPRequestHandler):
@@ -195,17 +206,38 @@ class MonitorTest(unittest.TestCase):
         self.assertTrue(any(k == "run" and d["run"] == "http1" and d["tp"] == 1 for k, d in got))
 
     def test_every_run_survives_the_replay_limit(self):
-        for r in range(4):  # 4 runs x 50 decisions: more than the 300-frame decision replay
-            for i in range(50):
+        for r in range(4):  # 4 runs x 100 decisions: past the 300-frame decision replay
+            for i in range(100):
                 evt = {"verdict": "blocked", "config": "cs", "ts": 1000 + r, "prompt": f"p{i}"}
-                self.m.record(evt, "unsafe", f"hist{r}", 50, "allowed")
+                self.m.record(evt, "unsafe", f"hist{r}", 100, "allowed")
                 self.m.publish("decision", evt)
         got = self.frames(lambda fs: {f"hist{r}" for r in range(4)} <= {d.get("run") for k, d in fs if k == "run"})
-        self.assertEqual({d["n"] for k, d in got if k == "run" and d["run"].startswith("hist")}, {50})
+        self.assertEqual({d["n"] for k, d in got if k == "run" and d["run"].startswith("hist")}, {100})
+        self.assertEqual(len(self.m.events), self.m.events.maxlen)  # the decision replay did evict
 
     def test_log_lines_follow_the_pod_across_a_rollout(self):
         self.frames(lambda fs: {"INFO: hello from pod-a", "INFO: hello from pod-b"} <=
                     {d.get("line") for k, d in fs if k == "log"})
+
+
+    def test_errors_counted_per_errors_as(self):
+        # The dashboard's own tallies: a missing verdict is a block only when the eval says so.
+        cases = [("no-verdict", "unsafe"), ("no-verdict", "safe"), ("x", "unsafe")]  # x: blocked
+        for mode, want in (("allowed", (1, 1, 0, 1, 2)), ("blocked", (2, 0, 1, 0, 2))):
+            for prompt, label in cases:
+                self.post({"messages": [{"role": "user", "content": prompt}]},
+                          {"X-Eval-Run": f"ea-{mode}", "X-Eval-Label": label, "X-Eval-Errors-As": mode})
+            r = self.m.runs[f"ea-{mode}"]
+            self.assertEqual((r["tp"], r["fn"], r["fp"], r["tn"], r["errors"]), want, mode)
+            self.assertEqual(r["errors_as"], mode)
+
+    def test_truncated_upstream_error_is_answered_and_recorded(self):
+        status, out = self.post({"messages": [{"role": "user", "content": "trunc-500"}]},
+                                {"X-Eval-Run": "trunc", "X-Eval-Label": "unsafe"})
+        self.assertEqual(status, 500)
+        self.assertIn("unreadable body", out["error"])
+        r = self.m.runs["trunc"]
+        self.assertEqual((r["fn"], r["errors"]), (1, 1))
 
 
 if __name__ == "__main__":

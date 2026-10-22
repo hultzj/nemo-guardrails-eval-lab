@@ -144,8 +144,15 @@ function showLog(line) {
 
 function connect() {
   const es = new EventSource("events");
-  // The server replays its backlog on every (re)connect, so start from empty tables.
-  es.onopen = () => { $("conn").textContent = "live"; $("conn").className = "live"; $("decisions").tBodies[0].textContent = ""; };
+  // The server replays its backlog on every (re)connect (a restarted monitor replays nothing),
+  // so start from empty tables and no remembered runs.
+  es.onopen = () => {
+    $("conn").textContent = "live"; $("conn").className = "live";
+    $("decisions").tBodies[0].textContent = ""; $("history").tBodies[0].textContent = "";
+    for (const k of Object.keys(runs)) delete runs[k];
+    for (const k of ["tp", "fn", "fp", "tn", "err", "p", "r", "f1", "fpr"]) $(k).textContent = "–";
+    $("runname").textContent = ""; $("progtxt").textContent = "no labelled run yet"; $("prog").value = 0;
+  };
   es.onerror = () => { $("conn").textContent = "reconnecting…"; $("conn").className = ""; };
   es.addEventListener("decision", m => showDecision(JSON.parse(m.data)));
   es.addEventListener("run", m => showRun(JSON.parse(m.data)));

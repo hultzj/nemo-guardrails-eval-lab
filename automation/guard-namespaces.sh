@@ -28,7 +28,7 @@ for ns in $namespaces; do
   state=$(oc get namespace "$ns" --ignore-not-found -o jsonpath='{.metadata.name}/{.metadata.labels.app\.kubernetes\.io/part-of}')
   case "$state" in
     "" | "$ns/$app") ;;
-    *) echo "namespace $ns exists and is not this lab's ($app); rename it in values.yaml" >&2; bad=1 ;;
+    *) echo "namespace $ns exists and is not this lab's ($app): change lab.namespace, lab.tenantSuffix or lab.decoyTenant in automation/argocd/values.yaml and the matching attributes in content/antora.yml (selftest checks they agree)" >&2; bad=1 ;;
   esac
 done
 exit "$bad"
