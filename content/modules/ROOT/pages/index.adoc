@@ -1,28 +1,42 @@
-= CHANGE-ME lab title
+= Evaluating NeMo Guardrails on OpenShift AI
 :navtitle: Introduction
 
-CHANGE-ME one-line tagline.
+Prove what your guardrails block, what they let through, and why: one request at a time, live.
 
-// What the lab examines, and why it matters outside the lab.
-CHANGE-ME
+Guardrails sit between users and a model and decide which prompts may pass. Shipping them
+without measurement means you know neither how much harmful traffic slips through nor how
+many legitimate users you turn away. This lab builds NeMo Guardrails on OpenShift AI, adds an
+NVIDIA content-safety model, and measures both configurations against a labelled prompt set,
+while a live monitor shows each decision, the rail that made it, and the guardrails server
+log as it happens.
 
 The lab progresses through these tasks:
 
-. CHANGE-ME
+. Stand up a NeMo Guardrails server with pattern-based rails, and prove only you can call it.
+. Add the Nemotron Safety Guard model as a second rail and compare the two on the same prompts.
+. Evaluate both configurations on 50 labelled prompts and read precision, recall and false-positive rate.
+. Try to tune the policy, measure whether it changed anything, and find out what happens when the safety model goes away.
 
 == Learning objectives
 
 By the end of the lab you will be able to:
 
-* CHANGE-ME
+* Deploy NeMo Guardrails through the OpenShift AI TrustyAI operator with authentication on its route.
+* Explain the difference between pattern rails (regex, Presidio PII) and a model-backed content-safety rail, with evidence of what each catches and misses.
+* Run a labelled evaluation and interpret precision, recall, F1, false-positive rate and false-negative rate.
+* Show that a configuration change is not a behaviour change until an evaluation confirms it.
+* Explain whether your guardrails fail open or fail closed when the safety model is unavailable, and who decides.
 
 == How to run the lab
 
 Each exercise names the state to change, the evidence to inspect, and the
 result that must be verified. Do not treat command completion as proof.
-Compare the observed resource, policy, or event with the stated expected
+Compare the observed verdict, rail, or metric with the stated expected
 result before continuing. Facilitators: see
 xref:92-facilitator-guide.adoc[Facilitator Guide].
+
+Presenters: the same pages work as a live demo. Keep the live monitor on screen next to the
+terminal; every command in Modules 1 to 4 shows up on it within a second.
 
 == Lab map
 
@@ -30,17 +44,34 @@ xref:92-facilitator-guide.adoc[Facilitator Guide].
 |===
 | Module | Outcome | Time
 
-| 1. CHANGE-ME
-| CHANGE-ME
-| CHANGE-ME min
+| 1. Stand up a guarded endpoint
+| A NeMo Guardrails server with regex and PII rails; anonymous and cross-tenant callers refused; first verdicts on the live monitor
+| 20 min
+
+| 2. Add a content-safety model
+| A second configuration backed by Nemotron Safety Guard; side-by-side verdicts that show what each rail catches and what it costs
+| 20 min
+
+| 3. Evaluate
+| Both configurations measured on 50 labelled prompts; misclassified prompts inspected
+| 25 min
+
+| 4. Tune and break
+| Evidence that prompt-level policy edits do not change the model's verdicts; fail-open versus fail-closed measured during a safety-model outage
+| 25 min
 |===
 
-*Total:* about CHANGE-ME minutes.
+*Total:* about 90 minutes.
 
 == Technical model
 
-// Each layer in one sentence, then what no single layer covers on its own.
-CHANGE-ME
+* *NeMo Guardrails server*: runs named rail configurations (ConfigMaps) and answers an OpenAI-style chat API with a verdict; deployed by the TrustyAI operator from a `NemoGuardrails` resource.
+* *Pattern rails*: regular expressions and Presidio named-entity detection; fast and predictable, blind to meaning.
+* *Content-safety rail*: asks the Nemotron Safety Guard model whether a prompt is unsafe and in which of 23 categories; sees meaning, costs a model call, and can be wrong.
+* *Live monitor*: a pass-through proxy in your namespace that records every verdict and streams it, with the guardrails pod log, to your browser.
+* *Evaluation Job*: sends the labelled prompt set through the monitor and computes the metrics.
+
+No single layer answers the customer question. The rails decide; only the evaluation says how well; only the monitor and the log say why a given request went the way it did.
 
 == Start here
 

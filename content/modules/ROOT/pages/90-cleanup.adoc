@@ -3,26 +3,50 @@
 
 == Remove what you created
 
-// Participant-created resources only; the GitOps-managed prerequisites stay.
+You created a `NemoGuardrails` resource, three rail ConfigMaps, and evaluation Jobs. Look at
+them first, then delete them. The live monitor, the dataset and your namespace belong to the
+lab and stay.
+
 [source,bash,role="execute",subs="attributes+"]
 ----
-CHANGE-ME
+NS=$(oc whoami){tenant_suffix}
+oc -n $NS get nemoguardrails,jobs -o name
+oc -n $NS get configmap regex-only content-safety tuned -o name
 ----
 
-Expected result: CHANGE-ME
+Expected result: `nemoguardrails.trustyai.opendatahub.io/nemoguardrails`, your `eval-...` Jobs,
+and the three ConfigMaps.
+// UNVERIFIED
+
+[CAUTION]
+====
+The next block deletes them. Your Web Terminal keeps running: it lives in a DevWorkspace in
+this namespace, which is not deleted.
+====
+
+[source,bash,role="execute"]
+----
+oc -n $NS delete nemoguardrails nemoguardrails --ignore-not-found --wait=true
+oc -n $NS delete jobs -l app=guardrails-eval --ignore-not-found
+oc -n $NS delete configmap regex-only content-safety tuned --ignore-not-found
+oc -n $NS get deploy,route -o name
+----
+
+Expected result: the deletions report `deleted`, and the last command lists only
+`deployment.apps/rails-monitor` and `route.route.openshift.io/rails-monitor`: the operator
+removed the guardrails Deployment, Service and Route with the resource.
 // UNVERIFIED
 
 == Remove the lab environment (whoever deployed it)
 
-Only the person who ran the bootstrap, or the RHDP order, removes the
-environment. From a cluster-admin shell in a checkout of this repository,
-first look at what the teardown will
-delete. Every Application listed goes, along with everything it created:
+Only the person who ran the bootstrap removes the environment. From a cluster-admin shell in
+a checkout of this repository, first look at what the teardown will delete. Every Application
+listed goes, along with everything it created, including every `*{tenant_suffix}` namespace:
 
 [source,bash,subs="attributes+"]
 ----
 make -C automation status
-oc get namespace {lab_namespace} {showroom_namespace}
+oc get namespace -l app.kubernetes.io/part-of=nemo-guardrails-eval-lab
 ----
 
 Then delete it and confirm the namespaces are gone:
@@ -30,7 +54,12 @@ Then delete it and confirm the namespaces are gone:
 [source,bash,subs="attributes+"]
 ----
 make -C automation teardown
-oc get namespace {lab_namespace} {showroom_namespace}
+oc get namespace -l app.kubernetes.io/part-of=nemo-guardrails-eval-lab
 ----
 
-The last command reports both namespaces `NotFound` once deletion completes.
+The last command prints `No resources found` once deletion completes. Two things outlive the
+teardown, by design or because they were created outside Argo CD:
+
+* The Keycloak users from `make users`. Remove them in the Keycloak admin console if they are no longer needed.
+* The DevWorkspace operator, which the Web Terminal operator pulled in. Look before removing:
+  `oc get csv -n openshift-operators | grep -E 'web-terminal|devworkspace'`.

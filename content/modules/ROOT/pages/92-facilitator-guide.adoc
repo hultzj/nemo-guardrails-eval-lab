@@ -4,22 +4,64 @@
 For facilitators provisioning lab environments ahead of class. Participants
 can skip this page.
 
+== Cluster prerequisites
+
+This lab runs on one shared cluster: every participant, and the presenter, gets a namespace
+`<username>{tenant_suffix}`. Check each prerequisite as cluster-admin:
+
+[cols="2,3",options="header"]
+|===
+| Prerequisite | Check
+
+| OpenShift {ocp_version} with OpenShift GitOps
+| `oc get csv -n openshift-gitops-operator`
+
+| OpenShift AI {rhoai_version} with the TrustyAI component `Managed`
+| `oc get crd nemoguardrails.trustyai.opendatahub.io`
+
+| A worker with 32 free CPU cores and 24 GiB free memory for the two safety-model replicas (16 cores each; tested on an m5.metal)
+| `oc describe nodes \| grep -A5 'Allocated resources'`
+
+| A default StorageClass (Showroom's PVC)
+| `oc get storageclass`
+
+| Egress to `huggingface.co` (the 4.9 GB model file, verified by sha256) and `ghcr.io` (llama.cpp image)
+| The `safety-guard` pods reach `Running`
+
+| An identity provider participants log in with, and their users
+| `make users` creates them in Keycloak (below)
+|===
+
+Per-participant footprint: the live monitor (about 100 MiB), the guardrails server (about
+1 GiB with Presidio), and short-lived evaluation Jobs. Shared: the safety model, 2 × 16 cores
+and 2 × 8 to 12 GiB.
+
 == Provision
 
-*RHDP:* order the Field Content CI with this repository's URL and the path
-`automation/argocd`. The order deploys the Showroom guide and the lab
-prerequisites through OpenShift GitOps.
+From a cluster-admin shell in a checkout of this repository:
 
-*Any other OpenShift cluster* with OpenShift GitOps installed, from a
-cluster-admin shell in a checkout of this repository:
-
+. Set the user list in `automation/argocd/values.yaml` (`lab.users`; the default is
+  `user1`..`user5` plus the presenter `kuro`), commit and push it. Argo CD deploys from the
+  remote, not from your checkout.
+. Create the Keycloak users with a password you choose. It is never stored in git:
++
+[source,bash]
+----
+LAB_USER_PASSWORD='<choose one>' make -C automation users
+----
+. Deploy:
++
 [source,bash]
 ----
 make -C automation bootstrap
 make -C automation status
 ----
 
-Repeat `status` until every Application shows `Synced` and `Healthy`.
+Repeat `status` until every Application shows `Synced` and `Healthy`. The safety model takes
+a few minutes on first start while it downloads and verifies the model file.
+
+If the cluster already has the Web Terminal operator, set `webTerminal.enabled: false` before
+bootstrapping, so Argo CD neither adopts nor, at teardown, deletes the owner's Subscription.
 
 == Verify every cluster
 
@@ -28,9 +70,18 @@ Repeat `status` until every Application shows `Synced` and `Healthy`.
 make -C automation verify
 ----
 
-Every line must print `PASS`. Fix any `FAIL` before participants arrive.
+Every line must print `PASS`. The checks impersonate each participant to confirm what they
+may and may not do, check that the decoy tenant `{decoy_namespace}` refuses anonymous callers,
+and ask the safety model to classify an unsafe prompt from a tenant namespace. Fix any `FAIL`
+before participants arrive.
+
+Then log in once as the first and the last participant in a browser, open the console's Web
+Terminal, and run the pre-flight from xref:02-details.adoc[Prerequisites and Environment].
 
 == Day of class
 
-* Share the Showroom URL: `oc -n {showroom_namespace} get route showroom`.
-* CHANGE-ME
+* Share the Showroom URL (`oc -n {showroom_namespace} get route showroom`), the console URL, and the password.
+* Presenter: run the lab as `kuro` with the live monitor on a second screen. Module 3's content-safety run is the moment to pause: the counters climb while the log scrolls.
+* Five participants evaluating at once share four parallel slots per safety-model replica; a content-safety run then takes up to about five minutes instead of two to three.
+* If a participant's monitor shows only `ERROR` verdicts, read its pod log pane first; the cause (a typo in a ConfigMap, a missing `rails.co`) is usually there.
+* Anyone with the Showroom URL can read the guide; it contains no credentials. Tear the lab down when class ends.

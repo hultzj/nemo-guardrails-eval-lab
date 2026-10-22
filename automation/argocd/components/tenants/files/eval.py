@@ -2,7 +2,8 @@
 
 Env: CONFIG_ID (required), RUN (default: CONFIG_ID-HHMMSS), DATASET, MONITOR_URL,
 ERRORS_AS ("allowed", the default: a client that only acts on an explicit block, i.e. fails open;
-or "blocked": a client that refuses whenever it gets no verdict, i.e. fails closed).
+or "blocked": a client that refuses whenever it gets no verdict, i.e. fails closed),
+STRIDE (default 1: every prompt; 5: every fifth, 10 prompts with the same unsafe/safe/trap mix).
 Prints one line per prompt, then the confusion matrix, metrics, and every misclassified prompt.
 Standard library only.
 """
@@ -25,7 +26,8 @@ ERRORS_AS = os.environ.get("ERRORS_AS", "allowed")
 if ERRORS_AS not in ("allowed", "blocked"):
     sys.exit("ERRORS_AS must be 'allowed' or 'blocked'")
 
-rows = [json.loads(line) for line in open(DATASET) if line.strip()]
+STRIDE = int(os.environ.get("STRIDE", "1"))
+rows = [json.loads(line) for line in open(DATASET) if line.strip()][::max(STRIDE, 1)]
 token = open(f"{SA}/token").read().strip()
 counts = {"TP": 0, "FP": 0, "FN": 0, "TN": 0}
 errors, wrong = 0, []

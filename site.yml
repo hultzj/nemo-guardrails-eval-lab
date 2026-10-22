@@ -1,7 +1,7 @@
 ---
 site:
-  title: "CHANGE-ME lab title"
-  url: https://CHANGE-ME.github.io/CHANGE-ME
+  title: "Evaluating NeMo Guardrails on OpenShift AI"
+  url: https://hultzj.github.io/nemo-guardrails-eval-lab
   start_page: modules::index.adoc
 
 content:

@@ -8,10 +8,8 @@ view_switcher:
   enabled: true
   default_mode: split
 
+# No Terminal tab: the Showroom URL has no login, and participants work as their own
+# OpenShift users (shared cluster), in the console's Web Terminal.
 tabs:
-  # The field-content Showroom chart proxies its terminal container at /terminal.
-  - name: Terminal
-    path: /terminal
-    port: 443
   - name: OpenShift Console
     url: 'https://console-openshift-console.${DOMAIN}'

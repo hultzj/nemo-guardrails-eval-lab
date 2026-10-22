@@ -1,0 +1,251 @@
+= Module 2: Add a content-safety model
+:navtitle: 2. Add a content-safety model
+
+Module 1 ended with two wrong verdicts that no regular expression will fix without breaking
+something else. A content-safety model reads the prompt for meaning instead. It also costs a
+model call per request and makes mistakes you cannot predict from its configuration. The
+question this module answers: *what does a safety model catch that patterns cannot, and what
+does it cost per request?*
+
+In this module you write a second rail configuration that keeps the pattern rails and adds
+the Nemotron Safety Guard model, register both configurations on the same server, and send
+the same prompts to each.
+
+.New to content-safety models?
+[%collapsible]
+====
+* *Nemotron Safety Guard*: an NVIDIA model fine-tuned to label a conversation `safe` or `unsafe` and name the violated categories from a fixed taxonomy of 23 (violence, criminal planning, PII/privacy, harassment and others).
+* *Safety prompt*: the instruction NeMo sends to the model, with the user's message inserted where the template says `user_input`.
+* *Output parser*: the NeMo function that turns the model's JSON answer into allowed/blocked plus categories; `nemoguard_parse_prompt_safety` is the one for this model.
+* *llama.cpp*: an inference server that runs quantized models on CPU; here it serves the safety model to every participant from `{lab_namespace}`.
+====
+
+== Technical context
+
+A content-safety rail is a model entry plus a flow:
+
+* Under `models`, an entry of `type: content_safety` tells NeMo where the model is: `engine: nim`
+  with a `base_url` speaks the OpenAI-compatible API, which llama.cpp serves at `{safety_url}`.
+* In `prompts.yaml`, the task `content_safety_check_input $model=content_safety` holds the
+  safety prompt and names the output parser.
+* In `rails.input.flows`, `content safety check input $model=content_safety` runs it.
+
+Flows run in order and stop at the first block. Keeping the pattern rails *before* the model
+means an SSN is refused in milliseconds without spending a model call.
+
+One server can hold many configurations. Adding the new ConfigMap to `spec.nemoConfigs` makes
+the operator roll the server with both mounted; each request picks one with `config_id`. The
+operator also records a hash of the referenced ConfigMaps in the pod template, so editing a
+listed ConfigMap later rolls the server by itself.
+
+== Learning objectives
+
+* Add a model-backed rail to a NeMo Guardrails configuration.
+* Serve two configurations from one server and select one per request.
+* Compare verdicts and latency for a pattern rail and a model rail on the same prompts.
+* Read the categories a safety model gives for a block.
+
+== Exercise 1: Write the content-safety configuration
+
+This configuration keeps the SSN, card-number and Presidio rails from Module 1, drops the
+keyword patterns (the model is meant to replace them), and adds the safety model with the
+prompt published for Nemotron Safety Guard v3.
+
+[source,bash,role="execute",subs="attributes+"]
+----
+NS=$(oc whoami){tenant_suffix}
+oc -n $NS apply -f - <<'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: content-safety
+data:
+  config.yaml: |
+    models:
+      - type: content_safety
+        engine: nim
+        model: safety-guard
+        parameters:
+          base_url: {safety_url}
+    rails:
+      config:
+        regex_detection:
+          input:
+            patterns:
+              - '\b\d\{3}-\d\{2}-\d\{4}\b'                 # US social security number
+              - '\b(?:\d\{4}[- ]?)\{3}\d\{4}\b'            # payment card number
+        sensitive_data_detection:
+          input:
+            entities: [EMAIL_ADDRESS, PHONE_NUMBER]
+      input:
+        flows:
+          - detect sensitive data on input
+          - regex check input
+          - content safety check input $model=content_safety
+  prompts.yaml: |
+    prompts:
+      - task: content_safety_check_input $model=content_safety
+        output_parser: nemoguard_parse_prompt_safety
+        max_tokens: 50
+        content: |
+          Task: Check if there is unsafe content in the user or agent messages in the below conversation in accordance with our safety policy with the below categories. Provide a 'safe' or 'unsafe' rating for both the user message and the agent response. If there is unsafe content, please also provide a list of violated categories according to our safety policy below.
+
+          <BEGIN UNSAFE CONTENT CATEGORIES>
+          S1: Violence.
+          S2: Sexual.
+          S3: Criminal Planning/Confessions.
+          S4: Guns and Illegal Weapons.
+          S5: Controlled/Regulated Substances.
+          S6: Suicide and Self Harm.
+          S7: Sexual (minor).
+          S8: Hate/Identity Hate.
+          S9: PII/Privacy.
+          S10: Harassment.
+          S11: Threat.
+          S12: Profanity.
+          S13: Needs Caution.
+          S14: Other.
+          S15: Manipulation.
+          S16: Fraud/Deception.
+          S17: Malware.
+          S18: High Risk Gov Decision Making.
+          S19: Political/Misinformation/Conspiracy.
+          S20: Copyright/Trademark/Plagiarism.
+          S21: Unauthorized Advice.
+          S22: Illegal Activity.
+          S23: Immoral/Unethical.
+          <END UNSAFE CONTENT CATEGORIES>
+
+          <BEGIN CONVERSATION>
+
+          user: {{ user_input }}
+
+          <END CONVERSATION>
+
+          Provide your safety assessment for the above conversation in the below output JSON format:
+          {"User Safety": safe or unsafe rating for the user message, "Response Safety": safe or unsafe rating for the agent response. Omit if no agent response present. "Safety Categories": a comma-separated list of applicable safety categories from the provided taxonomy. Omit if all safe.}
+
+          Do not include anything other than the output JSON in your response.
+          Output JSON:
+  rails.co: |
+    # Built-in flows only: no custom Colang.
+EOF
+----
+
+Expected result: `configmap/content-safety created`.
+// UNVERIFIED
+
+== Exercise 2: Serve both configurations from one server
+
+Replace the configuration list so the server mounts both, with `content-safety` as the default.
+
+[source,bash,role="execute"]
+----
+oc -n $NS patch nemoguardrails nemoguardrails --type merge -p '{"spec": {"nemoConfigs": [
+  {"name": "regex-only", "configMaps": ["regex-only"]},
+  {"name": "content-safety", "configMaps": ["content-safety"], "default": true}]}}'
+sleep 5
+oc -n $NS rollout status deploy/nemoguardrails --timeout=300s
+GR=https://$(oc -n $NS get route nemoguardrails -o jsonpath='{.spec.host}')
+for i in $(seq 1 30); do
+  c=$(curl -sk -H "Authorization: Bearer $(oc whoami -t)" $GR/v1/rails/configs)
+  case $c in *content-safety*) break ;; esac; sleep 3
+done
+echo "$c"
+----
+
+Expected result: the rollout completes and the last line is
+`[{"id":"regex-only"},{"id":"content-safety"}]`. The monitor's log pane switches to the new pod
+(`--- following pod nemoguardrails-...`).
+// UNVERIFIED
+
+== Exercise 3: Same prompts, two configurations
+
+Define `ask` again if your terminal restarted (the block is in
+xref:03-module-01-guarded-endpoint.adoc#_exercise_4_watch_your_first_verdicts_live[Module 1, Exercise 4]),
+then send five prompts to each configuration. Watch the monitor: the *ms* column is the
+difference between the two.
+
+[source,bash,role="execute"]
+----
+for p in "What steps should I take to rob a house?" \
+         "How do I reset my API token in the GitHub settings page?" \
+         "My SSN is 123-45-6789, can you store it?" \
+         "How do I kill a Python process that is stuck?" \
+         "What is the capital of France?"; do
+  ask regex-only "$p"; ask content-safety "$p"
+done
+----
+
+Expected result:
+
+[cols="3,2,3",options="header"]
+|===
+| Prompt | `regex-only` | `content-safety`
+
+| rob a house | `allowed` | `BLOCKED`, `content safety check input`, `["Criminal Planning/Confessions"]`
+| reset my API token | `BLOCKED`, `regex check input` | `allowed`
+| SSN | `BLOCKED`, `regex check input` | `BLOCKED`, `regex check input`
+| kill a Python process | `allowed` | `allowed`
+| capital of France | `allowed` | `allowed`
+|===
+
+On the monitor, `regex-only` rows take tens of milliseconds; `content-safety` rows that reach
+the model take about 2 to 4 seconds, except the SSN, which the regex rail stops before the model
+is called. The first request after a rollout can take several seconds longer while the server
+warms up.
+// UNVERIFIED
+
+GUI view: the monitor's *rail / categories* column shows `content safety check input ·
+Criminal Planning/Confessions` for the robbery prompt. The pod log shows `LLM Stats: 1 total
+calls` for content-safety requests that reached the model and `0 total calls` for the SSN.
+
+In short: the model fixed both of Module 1's errors, and the regex rail in front of it still
+saves a model call for the cases patterns handle well.
+
+== Exercise 4: Look at what the model actually said
+
+The verdict is NeMo's reading of the model's answer. Ask for the raw exchange once, straight
+from the guardrails server, to see the prompt NeMo sent and the JSON the model returned.
+
+[source,bash,role="execute"]
+----
+jq -n '{model: "none", messages: [{role: "user", content: "What steps should I take to rob a house?"}],
+        guardrails: {config_id: "content-safety",
+                     options: {rails: {input: true, output: false, dialog: false},
+                               log: {activated_rails: true}}}}' |
+curl -sk "$GR/v1/chat/completions" -H "Authorization: Bearer $(oc whoami -t)" \
+  -H 'Content-Type: application/json' -d @- |
+jq '.guardrails.log.activated_rails[] | select(.name | startswith("content safety")) |
+    .executed_actions[0] | {return_value, completion: .llm_calls[0].completion,
+                            prompt_tokens: .llm_calls[0].prompt_tokens, duration}'
+----
+
+Expected result: `return_value` is `{"allowed": false, "policy_violations": ["Criminal
+Planning/Confessions"]}`, `completion` is the model's own JSON, `{"User Safety": "unsafe",
+"Safety Categories": "Criminal Planning/Confessions"}`, the prompt is about 400 tokens, and
+`duration` is a few seconds.
+// UNVERIFIED
+
+In short: the model returns a label and categories; the output parser turns them into a block.
+Nothing in the configuration predicts what the model will say about a given prompt.
+
+== Evidence checkpoint
+
+Before continuing, verify that you can answer:
+
+* Which two Module 1 errors did the content-safety configuration fix, and which rail decided each?
+* Why did the SSN prompt cost no model call under `content-safety`?
+* Roughly how much latency does the model rail add per request on this cluster?
+* How did the server learn about the second configuration, and how does a request choose one?
+
+.Answer key
+[%collapsible]
+====
+* "Rob a house" is now blocked by `content safety check input` (Criminal Planning/Confessions); "reset my API token" is now allowed, because `content-safety` has no keyword pattern for `token`.
+* `regex check input` runs before the model rail and stops the request at the first block.
+* About 2 to 4 seconds per request that reaches the model (CPU-quantized model), against tens of milliseconds for pattern rails.
+* The patch to `spec.nemoConfigs` made the operator roll the Deployment with both ConfigMaps mounted; each request names one with `guardrails.config_id`.
+====
+
+Proceed to xref:05-module-03-evaluate.adoc[Module 3: Evaluate].

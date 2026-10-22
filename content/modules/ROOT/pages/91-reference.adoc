@@ -7,8 +7,26 @@
 |===
 | Project | Use it for
 
-| link:https://CHANGE-ME[CHANGE-ME^]
-| CHANGE-ME
+| link:https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/[Red Hat OpenShift AI^]
+| The TrustyAI operator that deploys NeMo Guardrails from a `NemoGuardrails` resource, with optional kube-rbac-proxy authentication.
+
+| link:https://github.com/NVIDIA/NeMo-Guardrails[NVIDIA NeMo Guardrails^]
+| The rails engine: configuration format, built-in flows (regex, sensitive data detection, content safety), and the server API.
+
+| link:https://huggingface.co/nvidia/Llama-3.1-Nemotron-Safety-Guard-8B-v3[Llama-3.1-Nemotron-Safety-Guard-8B-v3^]
+| The content-safety model, its 23-category taxonomy, and its prompt format. This lab serves a community Q4_K_M GGUF quantization of it.
+
+| link:https://huggingface.co/datasets/nvidia/Aegis-AI-Content-Safety-Dataset-2.0[Aegis 2.0 dataset^]
+| 40 of the 50 evaluation prompts (test split, CC BY 4.0). Each line of `eval-dataset` keeps its Aegis id.
+
+| link:https://github.com/ggml-org/llama.cpp[llama.cpp^]
+| CPU inference for the safety model, with an OpenAI-compatible API.
+
+| link:https://microsoft.github.io/presidio/[Microsoft Presidio^]
+| The named-entity detector behind NeMo's `detect sensitive data on input` rail.
+
+| link:https://github.com/hyogrin/rhoai-evalhub-lab[rhoai-evalhub-lab^]
+| The OpenShift AI evaluation workshop this lab's guardrail evaluation is modelled on (Korean hate speech, GPU-served safety models).
 |===
 
 == Evidence interpretation
@@ -17,15 +35,37 @@
 |===
 | Topic | Supported interpretation | Required evidence
 
-| CHANGE-ME
-| CHANGE-ME
-| CHANGE-ME
+| Endpoint access
+| Only callers allowed to `get services` in the namespace reach the guardrails server.
+| `401` anonymous, `200` own token, `403` another tenant's token (Module 1, Exercise 3).
+
+| Pattern rails
+| Regex and Presidio block what their patterns name, in milliseconds, and nothing else.
+| Module 1 verdicts and `regex-only` recall 0.00 on the labelled set.
+
+| Content-safety rail
+| On this set, the model blocks all unsafe prompts and refuses about one legitimate prompt in ten.
+| `content-safety` TP=20 FN=0 FP=3 TN=27, with the Job and monitor tallies agreeing.
+
+| Policy tuning
+| Removing a category from Nemotron Safety Guard's prompt does not remove it from its verdicts.
+| Identical `tuned` metrics and the model still answering `PII/Privacy`.
+
+| Outage behaviour
+| An unreachable safety model yields no verdict; the client's error handling decides fail-open or fail-closed.
+| `ERROR` verdicts, the pod log's connection error, and the two outage runs.
 |===
 
 == What this lab does not prove
 
-* CHANGE-ME
+* *Production accuracy.* 50 prompts, 40 of them from a dataset the model was trained on, give directional results only. Evaluate on your own traffic.
+* *Output rails.* Only input screening is measured; checking a model's answers is not exercised.
+* *Multilingual coverage.* The set is English. The reference workshop shows weaker results on Korean.
+* *Latency at scale.* The safety model runs quantized on CPU and is shared by everyone in the class.
+* *Robustness to adversarial prompts.* Jailbreak and obfuscation attacks are out of scope.
 
 == Further reading
 
-* link:https://CHANGE-ME[CHANGE-ME^]
+* link:https://docs.nvidia.com/nemo/guardrails/latest/[NeMo Guardrails documentation^]
+* link:https://docs.nvidia.com/nemo/guardrails/about-nemo-guardrails-library/rail-types[NeMo Guardrails: rail types^]
+* link:https://arxiv.org/abs/2501.09004[Aegis 2.0: a diverse AI safety dataset and risks taxonomy^]

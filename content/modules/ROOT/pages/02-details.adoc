@@ -7,32 +7,52 @@
 | If you are… | You need
 
 | Every participant
-| The Showroom terminal tab (`oc` is already logged in) and the OpenShift
-Console tab.
+| A username and password from the facilitator, a browser, and the OpenShift Console tab.
+Commands run in the console's Web Terminal (or your own `oc` and `jq`, logged in as yourself).
 
-| CHANGE-ME
-| CHANGE-ME
+| A presenter
+| The same, plus a second browser window for the live monitor so the audience sees decisions arrive.
 |===
 
 Provided by the facilitator:
 
-* An OpenShift cluster with the lab deployed through OpenShift GitOps.
-* CHANGE-ME
+* An OpenShift {ocp_version} cluster with OpenShift AI {rhoai_version} (TrustyAI component enabled) and this lab deployed through OpenShift GitOps.
+* Your own namespace, `<your username>{tenant_suffix}`, with the live monitor already running in it.
+* The shared safety model in `{lab_namespace}`.
+
+You act as *your own OpenShift user* throughout. In your namespace you can read everything
+except Secrets, and you can create ConfigMaps, `NemoGuardrails` resources and Jobs. Nothing else.
+
+== Open a terminal
+
+. In the OpenShift Console tab, log in with *keycloak* and your username and password.
+. Click the terminal icon (*>_*) in the console masthead.
+. If asked for a project, choose `<your username>{tenant_suffix}` and click *Start*.
+
+Expected result: a terminal opens at the bottom of the console with a shell prompt.
+// UNVERIFIED
 
 == Run the pre-flight check
 
-Run these in the Showroom terminal:
+Run this in the Web Terminal. The first line names your namespace; re-run it whenever the
+terminal restarts.
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+NS=$(oc whoami){tenant_suffix}
 oc whoami
-oc get namespace {lab_namespace}
-oc auth can-i CHANGE-ME -n {lab_namespace}
+oc get namespace $NS
+for r in nemoguardrails.trustyai.opendatahub.io configmaps jobs.batch; do
+  echo "create $r: $(oc auth can-i create $r -n $NS)"
+done
+echo "get pods/log: $(oc auth can-i get pods --subresource=log -n $NS)"
+echo "get secrets: $(oc auth can-i get secrets -n $NS)"
+jq --version
 ----
 
-Expected result: `oc whoami` prints
-`system:serviceaccount:{showroom_namespace}:showroom`, the namespace is
-`Active`, and every `auth can-i` line prints `yes`.
+Expected result: `oc whoami` prints your username, the namespace is `Active`, the three
+`create` lines and `get pods/log` print `yes`, `get secrets` prints `no`, and `jq` prints a version.
+The `no` is the point: the lab grants exactly what the exercises need.
 // UNVERIFIED
 
 == Access details
@@ -41,11 +61,17 @@ Expected result: `oc whoami` prints
 |===
 | Setting | Value
 
-| Lab namespace
-| `{lab_namespace}`
+| Your namespace
+| `<your username>{tenant_suffix}` (in the terminal: `$NS`)
+
+| Live monitor
+| `https://rails-monitor-<your username>{tenant_suffix}.{cluster_domain}`
+
+| Shared safety model
+| `{safety_url}`
 
 | OpenShift Console
 | link:https://console-openshift-console.{cluster_domain}[console-openshift-console.{cluster_domain}^]
 |===
 
-Proceed to xref:03-module-01-CHANGE-ME.adoc[Module 1: CHANGE-ME].
+Proceed to xref:03-module-01-guarded-endpoint.adoc[Module 1: Stand up a guarded endpoint].

@@ -3,8 +3,11 @@
 
 == Control questions
 
-// The questions a customer asks before adopting this; each module answers one with evidence.
-* *CHANGE-ME?*
+* *Who can call my guardrails endpoint?* Module 1 proves anonymous and cross-tenant callers are refused.
+* *What does a content-safety model catch that patterns cannot, and what does it cost?* Module 2 compares both on the same prompts, with per-request latency.
+* *How good are my guardrails, in numbers?* Module 3 measures precision, recall and false-positive rate on a labelled set.
+* *Did my tuning change anything?* Module 4 re-measures after a policy edit.
+* *What happens when the safety model is down?* Module 4 measures fail-open and fail-closed behaviour.
 
 == The stack
 
@@ -12,24 +15,66 @@
 |===
 | Layer | Component | Responsibility
 
-| CHANGE-ME
-| CHANGE-ME
-| CHANGE-ME
+| Rails engine
+| NeMo Guardrails server, deployed by the OpenShift AI {rhoai_version} TrustyAI operator from a `NemoGuardrails` resource; kube-rbac-proxy in front
+| Loads every rail configuration listed in the resource and answers `/v1/chat/completions` and `/v1/guardrail/checks` with a verdict. Only callers allowed to `get services` in your namespace get through.
+
+| Rail configurations
+| ConfigMaps you write: `regex-only`, `content-safety`, `tuned`
+| Which rails run, in which order, with which patterns and prompts. A request picks one with `config_id`.
+
+| Safety model (shared)
+| {safety_model} served on CPU by llama.cpp in `{lab_namespace}`
+| Classifies a prompt as safe or unsafe against 23 categories (violence, criminal planning, PII/privacy and others) and names the categories.
+
+| Live monitor
+| `rails-monitor` in your namespace, behind OpenShift login
+| Forwards your requests to the guardrails server, records each verdict, and streams decisions, run metrics and the guardrails pod log to the browser.
+
+| Evaluation
+| An `eval` Job you start, plus the `eval-dataset` ConfigMap (50 labelled prompts)
+| Sends every prompt through the monitor, compares each verdict with its label, prints the metrics and the misclassified prompts.
 |===
 
-== CHANGE-ME the one distinction to understand
+There is no main LLM in this lab. Every request asks only for the input rails' verdict, so a
+blocked prompt gets a refusal and an allowed prompt is echoed back unchanged. That keeps the
+lab free of API keys and makes every measurement about the guardrails alone.
 
-CHANGE-ME
+== The one distinction to understand: a pattern rail versus a model rail
+
+A *pattern rail* matches text: a regular expression for a social security number, a
+Presidio entity for an email address. It is fast (milliseconds), deterministic, and blind to
+meaning: it blocks "reset my API token" because of the word `token`, and passes
+"what steps should I take to rob a house" because no pattern names robbery.
+
+A *model rail* asks a classifier what the text means. It catches intent that no pattern names,
+costs one model call per request (seconds on CPU), and its mistakes are statistical: you
+cannot read them off the configuration, you can only measure them. That is why this lab
+evaluates.
 
 == Lab progression
 
-=== 1. CHANGE-ME
+=== 1. Stand up a guarded endpoint
 
-CHANGE-ME
+Write a regex and PII configuration, create the `NemoGuardrails` resource with authentication on, and send the first prompts through the live monitor.
+
+=== 2. Add a content-safety model
+
+Write a second configuration that adds the Nemotron Safety Guard rail, register both, and compare verdicts and latency on the same prompts.
+
+=== 3. Evaluate
+
+Run the 50-prompt evaluation against each configuration and read the confusion matrix, the metrics, and the prompts each one got wrong.
+
+=== 4. Tune and break
+
+Edit the safety policy and measure the effect, then cut the safety model off and measure what a client receives.
 
 == Interpretation guardrails
 
-// What the lab does not claim, and the evidence needed before claiming it.
-CHANGE-ME
+* *50 prompts is a smoke test, not a benchmark.* One prompt moves recall by five points. Use the numbers to compare configurations on the same set, not to rank models.
+* *The model has seen data like this before.* Forty prompts come from the Aegis 2.0 test split; Nemotron Safety Guard was trained on Aegis 2.0. Expect it to look better here than on your own traffic. The ten hand-written "trap" prompts are the out-of-distribution signal.
+* *Input rails only.* The lab measures prompt screening. Output rails (checking the model's answer) are not exercised.
+* *CPU latency is not GPU latency.* The safety model runs quantized on CPU. Latency numbers show relative cost between rails, not production performance.
 
 Continue with xref:02-details.adoc[Prerequisites and Environment].

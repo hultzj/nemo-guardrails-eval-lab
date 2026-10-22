@@ -1,5 +1,5 @@
 name: modules
-title: "CHANGE-ME lab title"
+title: "Evaluating NeMo Guardrails on OpenShift AI"
 version: ~
 nav:
   - modules/ROOT/nav.adoc
@@ -14,5 +14,12 @@ asciidoc:
     guid: '%GUID%'
     cluster_domain: 'apps.cluster.example.com'
     # Lab attributes: every name or version used on more than one page.
-    lab_namespace: 'CHANGE-ME'
+    lab_namespace: 'guardrails-lab-shared'
     showroom_namespace: 'showroom'
+    tenant_suffix: '-guardrails'
+    decoy_namespace: 'peer-demo-guardrails'
+    safety_url: 'http://safety-guard.guardrails-lab-shared.svc:8080/v1'
+    safety_model: 'Llama-3.1-Nemotron-Safety-Guard-8B-v3 (Q4_K_M)'
+    python_image: 'registry.access.redhat.com/ubi9/python-312:9.8-1792441557@sha256:f43a57e9a6a2243e333008219002b9f2b1661868a94199f5dec4d602e1501482'
+    rhoai_version: '3.5.2'
+    ocp_version: '5.0'
