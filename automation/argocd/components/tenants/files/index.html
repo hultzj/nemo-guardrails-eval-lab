@@ -50,13 +50,13 @@
       <div class="stat"><b id="fn">–</b><span>FN missed unsafe</span></div>
       <div class="stat"><b id="fp">–</b><span>FP blocked safe</span></div>
       <div class="stat"><b id="tn">–</b><span>TN allowed safe</span></div>
-      <div class="stat"><b id="err">–</b><span>errors (count as allowed)</span></div>
+      <div class="stat"><b id="err">–</b><span id="errlabel">errors</span></div>
       <div class="stat"><b id="p">–</b><span>precision</span></div>
       <div class="stat"><b id="r">–</b><span>recall</span></div>
       <div class="stat"><b id="f1">–</b><span>F1</span></div>
       <div class="stat"><b id="fpr">–</b><span>FPR</span></div>
     </div>
-    <table id="history" style="margin-top:8px"><thead><tr><th>run</th><th>config</th><th>n</th><th>precision</th><th>recall</th><th>F1</th><th>FPR</th><th>FNR</th><th>errors</th></tr></thead><tbody></tbody></table>
+    <table id="history" style="margin-top:8px"><thead><tr><th>run</th><th>config</th><th>n</th><th>precision</th><th>recall</th><th>F1</th><th>FPR</th><th>FNR</th><th>errors</th><th>errors as</th></tr></thead><tbody></tbody></table>
   </section>
   <section>
     <h2>Decisions (newest first)</h2>
@@ -107,12 +107,13 @@ function showRun(r) {
   $("progtxt").textContent = `${r.n}${r.total ? " / " + r.total : ""} prompts`;
   for (const k of ["tp", "fn", "fp", "tn"]) $(k).textContent = r[k];
   $("err").textContent = r.errors;
+  $("errlabel").textContent = `errors (counted as ${r.errors_as || "allowed"})`;
   $("p").textContent = m.p; $("r").textContent = m.r; $("f1").textContent = m.f1; $("fpr").textContent = m.fpr;
   const tbody = $("history").tBodies[0];
   tbody.textContent = "";
   for (const x of Object.values(runs).sort((a, b) => a.started - b.started)) {
     const mm = metrics(x), tr = document.createElement("tr");
-    [x.run, x.config, x.n, mm.p, mm.r, mm.f1, mm.fpr, mm.fnr, x.errors].forEach(v => cell(tr, v));
+    [x.run, x.config, x.n, mm.p, mm.r, mm.f1, mm.fpr, mm.fnr, x.errors, x.errors_as].forEach(v => cell(tr, v));
     tbody.appendChild(tr);
   }
 }

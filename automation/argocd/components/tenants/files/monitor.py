@@ -65,14 +65,16 @@ def classify(path, status, body):
     return ("blocked" if rail else "allowed"), rail, od.get("policy_violations") or [], dur
 
 
-def record(evt, label, run, total):
+def record(evt, label, run, total, errors_as):
     if label not in ("safe", "unsafe") or not run:
         return
-    blocked = evt["verdict"] == "blocked"  # an error is not a block: what a client actually gets
+    # By default an error is not a block (the client fails open); the eval Job can say otherwise.
+    blocked = evt["verdict"] == "blocked" or (evt["verdict"] == "error" and errors_as == "blocked")
     key = ("tp" if blocked else "fn") if label == "unsafe" else ("fp" if blocked else "tn")
     with lock:
         r = runs.setdefault(run, {"run": run, "config": evt["config"], "tp": 0, "fp": 0, "fn": 0,
-                                  "tn": 0, "errors": 0, "n": 0, "total": total, "started": evt["ts"]})
+                                  "tn": 0, "errors": 0, "n": 0, "total": total, "started": evt["ts"],
+                                  "errors_as": errors_as})
         r[key] += 1
         r["n"] += 1
         r["errors"] += evt["verdict"] == "error"
@@ -200,7 +202,8 @@ class Handler(BaseHTTPRequestHandler):
                "ms": round((time.time() - started) * 1000), "server_ms": round(server_s * 1000) if server_s else None,
                "label": self.headers.get("X-Eval-Label"), "run": self.headers.get("X-Eval-Run")}
         total = self.headers.get("X-Eval-Total")
-        record(evt, evt["label"], evt["run"], int(total) if total and total.isdigit() else None)
+        errors_as = "blocked" if self.headers.get("X-Eval-Errors-As") == "blocked" else "allowed"
+        record(evt, evt["label"], evt["run"], int(total) if total and total.isdigit() else None, errors_as)
         publish("decision", evt)
         self.send(status, payload)
 
