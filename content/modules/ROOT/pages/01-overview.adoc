@@ -1,0 +1,35 @@
+= Architecture and Control Boundaries
+:navtitle: Architecture and Control Boundaries
+
+== Control questions
+
+// The questions a customer asks before adopting this; each module answers one with evidence.
+* *CHANGE-ME?*
+
+== The stack
+
+[cols="1,2,3",options="header"]
+|===
+| Layer | Component | Responsibility
+
+| CHANGE-ME
+| CHANGE-ME
+| CHANGE-ME
+|===
+
+== CHANGE-ME the one distinction to understand
+
+CHANGE-ME
+
+== Lab progression
+
+=== 1. CHANGE-ME
+
+CHANGE-ME
+
+== Interpretation guardrails
+
+// What the lab does not claim, and the evidence needed before claiming it.
+CHANGE-ME
+
+Continue with xref:02-details.adoc[Prerequisites and Environment].

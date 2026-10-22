@@ -1,0 +1,36 @@
+= Facilitator Guide
+:navtitle: Facilitator Guide
+
+For facilitators provisioning lab environments ahead of class. Participants
+can skip this page.
+
+== Provision
+
+*RHDP:* order the Field Content CI with this repository's URL and the path
+`automation/argocd`. The order deploys the Showroom guide and the lab
+prerequisites through OpenShift GitOps.
+
+*Any other OpenShift cluster* with OpenShift GitOps installed, from a
+cluster-admin shell in a checkout of this repository:
+
+[source,bash]
+----
+make -C automation bootstrap
+make -C automation status
+----
+
+Repeat `status` until every Application shows `Synced` and `Healthy`.
+
+== Verify every cluster
+
+[source,bash]
+----
+make -C automation verify
+----
+
+Every line must print `PASS`. Fix any `FAIL` before participants arrive.
+
+== Day of class
+
+* Share the Showroom URL: `oc -n {showroom_namespace} get route showroom`.
+* CHANGE-ME

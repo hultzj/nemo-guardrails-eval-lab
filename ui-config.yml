@@ -1,0 +1,17 @@
+---
+type: showroom
+
+default_width: 30
+persist_url_state: true
+
+view_switcher:
+  enabled: true
+  default_mode: split
+
+tabs:
+  # The field-content Showroom chart proxies its terminal container at /terminal.
+  - name: Terminal
+    path: /terminal
+    port: 443
+  - name: OpenShift Console
+    url: 'https://console-openshift-console.${DOMAIN}'

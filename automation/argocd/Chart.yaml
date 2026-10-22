@@ -1,0 +1,5 @@
+apiVersion: v2
+name: nemo-guardrails-eval-lab
+description: RHDP field content for the NeMo Guardrails evaluation lab
+type: application
+version: 0.1.0

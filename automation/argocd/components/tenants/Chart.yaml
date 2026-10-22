@@ -1,0 +1,5 @@
+apiVersion: v2
+name: tenants
+description: NeMo Guardrails evaluation lab, tenants component
+type: application
+version: 0.1.0

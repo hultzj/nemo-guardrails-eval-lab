@@ -1,0 +1,48 @@
+= CHANGE-ME lab title
+:navtitle: Introduction
+
+CHANGE-ME one-line tagline.
+
+// What the lab examines, and why it matters outside the lab.
+CHANGE-ME
+
+The lab progresses through these tasks:
+
+. CHANGE-ME
+
+== Learning objectives
+
+By the end of the lab you will be able to:
+
+* CHANGE-ME
+
+== How to run the lab
+
+Each exercise names the state to change, the evidence to inspect, and the
+result that must be verified. Do not treat command completion as proof.
+Compare the observed resource, policy, or event with the stated expected
+result before continuing. Facilitators: see
+xref:92-facilitator-guide.adoc[Facilitator Guide].
+
+== Lab map
+
+[cols="1,3,1",options="header"]
+|===
+| Module | Outcome | Time
+
+| 1. CHANGE-ME
+| CHANGE-ME
+| CHANGE-ME min
+|===
+
+*Total:* about CHANGE-ME minutes.
+
+== Technical model
+
+// Each layer in one sentence, then what no single layer covers on its own.
+CHANGE-ME
+
+== Start here
+
+Read xref:01-overview.adoc[Architecture and Control Boundaries], then verify
+the lab in xref:02-details.adoc[Prerequisites and Environment].

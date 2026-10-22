@@ -1,0 +1,66 @@
+# Repository Argo CD syncs the children from (this lab's repo).
+gitops:
+  repoUrl: https://github.com/hultzj/nemo-guardrails-eval-lab.git
+  revision: main
+  basePath: automation/argocd
+
+argocd:
+  namespace: openshift-gitops
+  # The field-content workload overrides this to "deployed".
+  project: default
+
+lab:
+  # Shared namespace: the safety model every tenant's guardrails call.
+  namespace: guardrails-lab-shared
+  # One tenant namespace per user: <user><tenantSuffix>. OpenShift usernames, DNS-safe.
+  tenantSuffix: -guardrails
+  users: [user1, user2, user3, user4, user5, kuro]
+  # Facilitator-owned tenant: the deterministic target of the cross-tenant denial check.
+  decoyTenant: peer-demo
+
+# false for a participant-built lab with no components.
+prereqs:
+  enabled: true
+
+safetyModel:
+  replicas: 2
+  # llama.cpp threads per replica; requests reserve the same CPU so the pods land on a large node.
+  threads: 16
+  parallel: 4
+  # Nemotron Safety Guard 8B v3, Q4_K_M GGUF, pinned to a repo revision and verified by sha256.
+  url: https://huggingface.co/mradermacher/Llama-3.1-Nemotron-Safety-Guard-8B-v3-GGUF/resolve/0aead3d3f1e0874525f365d98dbe85a058d9a991/Llama-3.1-Nemotron-Safety-Guard-8B-v3.Q4_K_M.gguf
+  sha256: 0844ad4fca78bad794bb89aeefa17c20c07d36bbde2e39fd15348fe00558107e
+
+images:
+  llamacpp: ghcr.io/ggml-org/llama.cpp:server@sha256:8c74db29f1a2bef3f0a331b52c4d6214601dfceed4bee0b94cc48b3b23ff257d
+  python: registry.access.redhat.com/ubi9/python-312:9.8-1792441557@sha256:f43a57e9a6a2243e333008219002b9f2b1661868a94199f5dec4d602e1501482
+  # The cluster's own oauth-proxy (release payload): oc get is oauth-proxy -n openshift. verify.sh checks it matches.
+  oauthProxy: quay.io/openshift-release-dev/ocp-v5.0-art-dev@sha256:1e1999d5e0dc35999f7cd11f94d642f790d17c3d6d5da29a2aae920631a637e2
+
+# Participants work as their own users with the Showroom terminal off, so they need a terminal:
+# the Web Terminal operator. false when the cluster already has it (Argo CD must not adopt, and
+# teardown must not delete, the owner's Subscription).
+webTerminal:
+  enabled: true
+
+showroom:
+  enabled: true
+  namespace: showroom
+  # false when participants use their own identity (shared cluster or cluster-admin lab):
+  # the Showroom URL has no login, so its terminal must not hold their permissions.
+  terminal: false
+  # Upstream chart, referenced (not copied) and pinned to a commit.
+  chart:
+    repoUrl: https://github.com/rhpds/field-sourced-content-template.git
+    revision: 24ab4baf372d3dbe6b31a7532f8ad8683b5a22c6
+    path: examples/helm/components/showroom
+  # The upstream default is a moving :latest tag; pin the terminal you verified with.
+  terminalImage: quay.io/rhpds/openshift-showroom-terminal-ocp:4.22-2026-09-14-060546@sha256:c0a85c5b62a9081208f44b01dfbe4a411369dbe42079a3d6fe2312824e4a1054
+
+# Injected by the field-content workload (or bootstrap.yaml); do not set here.
+deployer:
+  domain: ""
+  apiUrl: ""
+
+fieldContent:
+  deploymentType: helm

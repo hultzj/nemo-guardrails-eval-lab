@@ -1,0 +1,5 @@
+apiVersion: v2
+name: safety-model
+description: NeMo Guardrails evaluation lab, safety-model component
+type: application
+version: 0.1.0

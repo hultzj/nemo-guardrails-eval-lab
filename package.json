@@ -1,0 +1,12 @@
+{
+  "name": "nemo-guardrails-eval-lab",
+  "private": true,
+  "scripts": {
+    "build": "antora --fetch --log-failure-level warn site.yml",
+    "check": "bash scripts/check-lab.sh"
+  },
+  "devDependencies": {
+    "@antora/cli": "3.2.0",
+    "@antora/site-generator": "3.2.0"
+  }
+}

@@ -1,0 +1,51 @@
+= Prerequisites and Environment
+:navtitle: Prerequisites and Environment
+
+== What you need
+
+|===
+| If you are… | You need
+
+| Every participant
+| The Showroom terminal tab (`oc` is already logged in) and the OpenShift
+Console tab.
+
+| CHANGE-ME
+| CHANGE-ME
+|===
+
+Provided by the facilitator:
+
+* An OpenShift cluster with the lab deployed through OpenShift GitOps.
+* CHANGE-ME
+
+== Run the pre-flight check
+
+Run these in the Showroom terminal:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+oc whoami
+oc get namespace {lab_namespace}
+oc auth can-i CHANGE-ME -n {lab_namespace}
+----
+
+Expected result: `oc whoami` prints
+`system:serviceaccount:{showroom_namespace}:showroom`, the namespace is
+`Active`, and every `auth can-i` line prints `yes`.
+// UNVERIFIED
+
+== Access details
+
+[cols="1,2",options="header"]
+|===
+| Setting | Value
+
+| Lab namespace
+| `{lab_namespace}`
+
+| OpenShift Console
+| link:https://console-openshift-console.{cluster_domain}[console-openshift-console.{cluster_domain}^]
+|===
+
+Proceed to xref:03-module-01-CHANGE-ME.adoc[Module 1: CHANGE-ME].

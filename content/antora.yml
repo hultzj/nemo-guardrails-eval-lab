@@ -1,0 +1,18 @@
+name: modules
+title: "CHANGE-ME lab title"
+version: ~
+nav:
+  - modules/ROOT/nav.adoc
+
+asciidoc:
+  attributes:
+    experimental: true
+    page-pagination: true
+    # A missing {attribute} becomes a warning, and the build fails on warnings.
+    attribute-missing: warn
+    # Showroom overrides these from user_data at deploy time; defaults are for local preview.
+    guid: '%GUID%'
+    cluster_domain: 'apps.cluster.example.com'
+    # Lab attributes: every name or version used on more than one page.
+    lab_namespace: 'CHANGE-ME'
+    showroom_namespace: 'showroom'

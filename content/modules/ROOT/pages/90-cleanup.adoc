@@ -1,0 +1,36 @@
+= Cleanup
+:navtitle: Cleanup
+
+== Remove what you created
+
+// Participant-created resources only; the GitOps-managed prerequisites stay.
+[source,bash,role="execute",subs="attributes+"]
+----
+CHANGE-ME
+----
+
+Expected result: CHANGE-ME
+// UNVERIFIED
+
+== Remove the lab environment (whoever deployed it)
+
+Only the person who ran the bootstrap, or the RHDP order, removes the
+environment. From a cluster-admin shell in a checkout of this repository,
+first look at what the teardown will
+delete. Every Application listed goes, along with everything it created:
+
+[source,bash,subs="attributes+"]
+----
+make -C automation status
+oc get namespace {lab_namespace} {showroom_namespace}
+----
+
+Then delete it and confirm the namespaces are gone:
+
+[source,bash,subs="attributes+"]
+----
+make -C automation teardown
+oc get namespace {lab_namespace} {showroom_namespace}
+----
+
+The last command reports both namespaces `NotFound` once deletion completes.
