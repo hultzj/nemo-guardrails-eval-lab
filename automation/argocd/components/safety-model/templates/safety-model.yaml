@@ -46,19 +46,28 @@ spec:
             allowPrivilegeEscalation: false
             capabilities: {drop: [ALL]}
           resources:
-            requests: {cpu: 500m, memory: 256Mi}
-            limits: {memory: 512Mi}
+            # Writing the 4.9 GB file through the page cache counts against this limit; 512Mi got OOM-killed.
+            requests: {cpu: 500m, memory: 512Mi}
+            limits: {memory: 2Gi}
       containers:
         - name: llama-server
           image: {{ .Values.images.llamacpp }}
+          # This llama.cpp build rejects --flag=value: flag and value are separate arguments.
           args:
-            - --model=/models/model.gguf
-            - --alias=safety-guard
-            - --host=0.0.0.0
-            - --port=8080
-            - --ctx-size={{ mul 2048 .Values.safetyModel.parallel }}
-            - --parallel={{ .Values.safetyModel.parallel }}
-            - --threads={{ .Values.safetyModel.threads }}
+            - --model
+            - /models/model.gguf
+            - --alias
+            - safety-guard
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8080"
+            - --ctx-size
+            - {{ mul 2048 .Values.safetyModel.parallel | quote }}
+            - --parallel
+            - {{ .Values.safetyModel.parallel | quote }}
+            - --threads
+            - {{ .Values.safetyModel.threads | quote }}
           ports:
             - {name: http, containerPort: 8080}
           volumeMounts: [{name: models, mountPath: /models}]
