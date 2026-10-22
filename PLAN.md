@@ -69,7 +69,7 @@ Jobs + `pods/log`. No Secret read (least privilege; the lab itself has no secret
 ### Module 1, Exercise 2: Create the regex-only config and the NemoGuardrails CR
 - **Teaches:** the operator model (config in ConfigMaps, server from the CR); auth enabled at creation.
 - **Steps:** apply ConfigMap `regex-only` (regex + Presidio PII rails, `rails.co` included); apply CR with annotation `security.opendatahub.io/enable-auth: "true"`; wait chain on the Deployment (not the CR phase).
-- **Caveats (verified in spike):** CR reports `phase: Ready` while the pod crash-loops (missing `rails.co`), so readiness = Deployment available + `/v1/rails/configs` answering. The auth annotation must be present **at creation**: added later, the operator adds the kube-rbac-proxy sidecar but leaves the Service/Route pointing at :8000, i.e. still open. Access = `get services/nemoguardrails-service` in the namespace. Proxy upstream timeout 30s.
+- **Caveats (verified in spike):** CR reports `phase: Ready` while the pod crash-loops (missing `rails.co`), so readiness = Deployment available + `/v1/rails/configs` answering. The auth annotation must be present **at creation**: added later, the operator adds the kube-rbac-proxy sidecar but leaves the Service/Route pointing at :8000, i.e. still open. Access is checked as `get services` in the namespace: the operator's kube-rbac-proxy config names `resourceName: nemoguardrails-service`, a key the proxy ignores, so a Role restricted to that resourceName is denied (verified: 403 for the monitor SA) while `view` passes. Proxy upstream timeout 30s.
 
 ### Module 1, Exercise 3: Prove the route is protected
 - **Negative controls:** no token → 401; own token → 200; own token against `peer-demo-guardrails` route → 403.

@@ -28,7 +28,8 @@ API_CTX = ssl.create_default_context(cafile=f"{SA}/ca.crt")
 API = "https://kubernetes.default.svc"
 
 lock = threading.Lock()
-events = collections.deque(maxlen=300)  # backlog replayed to each new browser
+events = collections.deque(maxlen=300)  # decisions and runs, replayed to each new browser
+log_tail = collections.deque(maxlen=60)  # recent log lines, replayed too
 runs = {}  # run id -> counters
 subscribers = []
 
@@ -40,8 +41,7 @@ def token():
 def publish(kind, data):
     msg = f"event: {kind}\ndata: {json.dumps(data)}\n\n"
     with lock:
-        if kind != "log":
-            events.append(msg)
+        (log_tail if kind == "log" else events).append(msg)
         for q in list(subscribers):
             q.put(msg)
 
@@ -139,7 +139,7 @@ class Handler(BaseHTTPRequestHandler):
     def stream(self):
         q = queue.Queue()
         with lock:
-            backlog = list(events)
+            backlog = list(events) + list(log_tail)
             subscribers.append(q)
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")

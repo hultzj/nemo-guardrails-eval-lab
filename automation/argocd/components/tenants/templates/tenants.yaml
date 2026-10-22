@@ -60,8 +60,9 @@ metadata:
     # Lets the oauth-proxy sidecar use this ServiceAccount as an OAuth client for its Route.
     serviceaccounts.openshift.io/oauth-redirectreference.primary: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"rails-monitor"}}'
 ---
-# The monitor follows the guardrails pod log and calls the guardrails Service, whose
-# kube-rbac-proxy admits callers that may get services/nemoguardrails-service here.
+# The monitor follows the guardrails pod log and calls the guardrails Service. Its kube-rbac-proxy
+# asks "may get services in this namespace": the operator writes resourceName, which the proxy
+# ignores, so a rule restricted to resourceNames: [nemoguardrails-service] is denied (verified, 403).
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -73,7 +74,6 @@ rules:
     verbs: [get, list]
   - apiGroups: [""]
     resources: [services]
-    resourceNames: [nemoguardrails-service]
     verbs: [get]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
