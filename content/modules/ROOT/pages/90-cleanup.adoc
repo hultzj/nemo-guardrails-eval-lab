@@ -14,9 +14,8 @@ oc -n $NS get nemoguardrails,jobs -o name
 oc -n $NS get configmap regex-only content-safety tuned -o name
 ----
 
-Expected result: `nemoguardrails.trustyai.opendatahub.io/nemoguardrails`, your `eval-...` Jobs,
-and the three ConfigMaps.
-// UNVERIFIED
+Expected result: `nemoguardrails.trustyai.opendatahub.io/nemoguardrails`, one `job.batch/eval-...`
+per evaluation you ran, and `configmap/regex-only`, `configmap/content-safety`, `configmap/tuned`.
 
 [CAUTION]
 ====
@@ -32,10 +31,10 @@ oc -n $NS delete configmap regex-only content-safety tuned --ignore-not-found
 oc -n $NS get deploy,route -o name
 ----
 
-Expected result: the deletions report `deleted`, and the last command lists only
-`deployment.apps/rails-monitor` and `route.route.openshift.io/rails-monitor`: the operator
+Expected result: every deletion reports `deleted from <you>{tenant_suffix} namespace`, and the
+last command lists only `deployment.apps/rails-monitor`, your terminal's
+`deployment.apps/workspace...`, and `route.route.openshift.io/rails-monitor`: the operator
 removed the guardrails Deployment, Service and Route with the resource.
-// UNVERIFIED
 
 == Remove the lab environment (whoever deployed it)
 

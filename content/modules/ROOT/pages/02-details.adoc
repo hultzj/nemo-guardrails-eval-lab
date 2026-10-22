@@ -27,10 +27,18 @@ except Secrets, and you can create ConfigMaps, `NemoGuardrails` resources and Jo
 
 . Click the *OpenShift Console* tab (it opens a new browser tab) and log in with *keycloak* and your username and password.
 . Click the terminal icon (*>_*) in the console masthead.
-. If asked for a project, choose `<your username>{tenant_suffix}` and click *Start*.
+. In *Initialize terminal*, open the *Project* list, choose `<your username>{tenant_suffix}` (not *Create Project*: you cannot create projects), and click *Start*.
 
-Expected result: a terminal opens at the bottom of the console with a shell prompt.
-// UNVERIFIED
+Expected result: the *Initialize terminal* form lists *Create Project* and your own project
+only; after *Start*, the terminal shows `Welcome to the OpenShift Web Terminal` and a
+`bash-5.1 ~ $` prompt. The first start takes a minute or two.
+
+[NOTE]
+====
+The Web Terminal stops after 15 minutes without keyboard input (change it with *Timeout* in
+*Initialize terminal*). Reopening it starts a fresh shell: re-run the first line of the next
+block to set `$NS`, and the helper blocks a module points you to.
+====
 
 == Run the pre-flight check
 
@@ -51,9 +59,8 @@ jq --version
 ----
 
 Expected result: `oc whoami` prints your username, the namespace is `Active`, the three
-`create` lines and `get pods/log` print `yes`, `get secrets` prints `no`, and `jq` prints a version.
+`create` lines and `get pods/log` print `yes`, `get secrets` prints `no`, and `jq` prints `jq-1.6`.
 The `no` is the point: the lab grants exactly what the exercises need.
-// UNVERIFIED
 
 == Access details
 

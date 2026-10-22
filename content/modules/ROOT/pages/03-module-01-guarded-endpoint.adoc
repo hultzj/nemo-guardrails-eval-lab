@@ -88,7 +88,6 @@ EOF
 
 Expected result: `configmap/regex-only created` (or `configured` on a re-run). Nothing runs
 yet; this is data.
-// UNVERIFIED
 
 == Exercise 2: Create the guardrails server
 
@@ -115,9 +114,9 @@ oc -n $NS get pods -l app=nemoguardrails
 oc -n $NS get nemoguardrails nemoguardrails -o jsonpath='{.status.phase}{"\n"}'
 ----
 
-Expected result: `deployment "nemoguardrails" successfully rolled out`, one pod `2/2 Running`
-(the server and the kube-rbac-proxy sidecar), and the phase `Ready`.
-// UNVERIFIED
+Expected result: `deployment "nemoguardrails" successfully rolled out` (about ten seconds),
+one pod `nemoguardrails-...` at `2/2 Running` (the server and the kube-rbac-proxy sidecar), and
+the phase `Ready`.
 
 [IMPORTANT]
 ====
@@ -145,7 +144,6 @@ Expected result: `anonymous: 401`; `you: [{"id":"regex-only"}]`; `other tenant: 
 (user=<you>, verb=get, resource=services, subresource=)`. The 401 shows the proxy demands a
 token, the 403 shows a valid token is not enough: it must be allowed in *that* namespace. The
 200 is also your readiness proof: the server loaded the configuration.
-// UNVERIFIED
 
 .The scripted assertion for this exercise
 [%collapsible]
@@ -193,10 +191,11 @@ ask() {  # ask <config_id> "<prompt>": one input-rail verdict, sent through the 
 }
 ----
 
-Expected result: `Live monitor: https://rails-monitor-<you>{tenant_suffix}.{cluster_domain}`,
-and after login the monitor page shows a green *live* badge, empty tables, and a guardrails
-pod log that starts with `--- following pod nemoguardrails-...`.
-// UNVERIFIED
+Expected result: `Live monitor: https://rails-monitor-<you>{tenant_suffix}.{cluster_domain}`.
+In the browser, OpenShift shows *Authorize Access*: service account `rails-monitor` in your
+project requests `user:info` and `user:check-access`. After *Allow selected permissions*, the
+monitor page shows a green *live* badge, an empty *Evaluation run* panel, and the guardrails
+pod log on the right.
 
 Now send the prompts and watch the monitor while they run:
 
@@ -224,10 +223,10 @@ Expected result, one line per prompt:
 | pipe bomb | `BLOCKED` | `regex check input`
 |===
 
-The same six rows appear at the top of the monitor's *Decisions* table within a second, each
-under 100 ms, and the pod log shows the server's events for each request (`Total processing
-took ... LLM Stats: 0 total calls`).
-// UNVERIFIED
+The same six rows appear at the top of the monitor's *Decisions* table within a second. The
+first request after the server starts takes several seconds (8.6 s in testing) while it warms
+up; the rest take 50 to 200 ms. The pod log shows the server's events for each request, ending
+in `Total processing took 0.04 seconds. LLM Stats: 0 total calls`.
 
 GUI view: on the monitor page, the *Decisions* table shows the verdict badge, the rail, and the
 latency per request; the right-hand pane is the guardrails pod log, streamed live.

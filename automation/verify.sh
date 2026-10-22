@@ -99,8 +99,13 @@ for u in $USERS; do
   check "$u: rails-monitor route refuses anonymous callers" route_refuses_anonymous "$ns" rails-monitor
   check "$u: can create nemoguardrails" can "$u" create nemoguardrails.trustyai.opendatahub.io -n "$ns"
   check "$u: can create configmaps and jobs" bash -c "$(declare -f as_user can); can $u create configmaps -n $ns && can $u create jobs.batch -n $ns"
-  check "$u: cannot read secrets" cannot "$u" get secrets -n "$ns"
-  check "$u: cannot create nemoguardrails in the decoy tenant" cannot "$u" create nemoguardrails.trustyai.opendatahub.io -n "$DECOY_NS"
+  # A cluster-admin presenter (kuro on the test cluster) may do anything; denials apply to participants.
+  if can "$u" '*' '*' --all-namespaces; then
+    echo "SKIP: $u: is cluster-admin; participant denial checks do not apply"
+  else
+    check "$u: cannot read secrets" cannot "$u" get secrets -n "$ns"
+    check "$u: cannot create nemoguardrails in the decoy tenant" cannot "$u" create nemoguardrails.trustyai.opendatahub.io -n "$DECOY_NS"
+  fi
   if $first; then
     check "safety model classifies an unsafe prompt (from $ns)" safety_model_classifies "$ns"
     first=false

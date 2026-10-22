@@ -133,7 +133,6 @@ EOF
 ----
 
 Expected result: `configmap/content-safety created`.
-// UNVERIFIED
 
 == Exercise 2: Serve both configurations from one server
 
@@ -154,10 +153,9 @@ done
 echo "$c"
 ----
 
-Expected result: the rollout completes and the last line is
-`[{"id":"regex-only"},{"id":"content-safety"}]`. The monitor's log pane switches to the new pod
-(`--- following pod nemoguardrails-...`).
-// UNVERIFIED
+Expected result: `nemoguardrails patched`, the rollout completes (the old pod terminates
+first), and the last line is `[{"id":"regex-only"},{"id":"content-safety"}]`. The monitor's log
+pane switches to the new pod (`--- following pod nemoguardrails-...`).
 
 == Exercise 3: Same prompts, two configurations
 
@@ -190,11 +188,10 @@ Expected result:
 | capital of France | `allowed` | `allowed`
 |===
 
-On the monitor, `regex-only` rows take tens of milliseconds; `content-safety` rows that reach
-the model take about 2 to 4 seconds, except the SSN, which the regex rail stops before the model
-is called. The first request after a rollout can take several seconds longer while the server
-warms up.
-// UNVERIFIED
+On the monitor, `regex-only` rows take about 50 ms; `content-safety` rows that reach the model
+take about 1.8 to 4.2 seconds, except the SSN, which the regex rail stops in about 50 ms before
+the model is called. The first request after a rollout takes several seconds longer (8.6 s in
+testing) while the server warms up.
 
 GUI view: the monitor's *rail / categories* column shows `content safety check input ·
 Criminal Planning/Confessions` for the robbery prompt. The pod log shows `LLM Stats: 1 total
@@ -223,9 +220,8 @@ jq '.guardrails.log.activated_rails[] | select(.name | startswith("content safet
 
 Expected result: `return_value` is `{"allowed": false, "policy_violations": ["Criminal
 Planning/Confessions"]}`, `completion` is the model's own JSON, `{"User Safety": "unsafe",
-"Safety Categories": "Criminal Planning/Confessions"}`, the prompt is about 400 tokens, and
-`duration` is a few seconds.
-// UNVERIFIED
+"Safety Categories": "Criminal Planning/Confessions"}`, `prompt_tokens` is about 405, and
+`duration` is about 3 seconds.
 
 In short: the model returns a label and categories; the output parser turns them into a block.
 Nothing in the configuration predicts what the model will say about a given prompt.
