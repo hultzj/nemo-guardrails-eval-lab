@@ -11,6 +11,25 @@ metadata:
     argocd.argoproj.io/managed-by: {{ $.Values.argocdNamespace }}
     app.kubernetes.io/part-of: {{ $.Values.partOf }}
 ---
+# The NeMo server listens unauthenticated on :8000 behind its kube-rbac-proxy: without this policy
+# another tenant's pod could call it by pod IP and skip the proxy (verified: 200 before, refused after).
+# Admit only this namespace, the OpenShift router (Routes) and the console (Web Terminal).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tenant-isolation
+  namespace: {{ $ns }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels: {network.openshift.io/policy-group: ingress}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: openshift-console}
+---
 # Participants read everything except Secrets (ClusterRole view) ...
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -264,6 +283,25 @@ metadata:
     demo.redhat.com/application: field-content
     argocd.argoproj.io/managed-by: {{ $.Values.argocdNamespace }}
     app.kubernetes.io/part-of: {{ $.Values.partOf }}
+---
+# The NeMo server listens unauthenticated on :8000 behind its kube-rbac-proxy: without this policy
+# another tenant's pod could call it by pod IP and skip the proxy (verified: 200 before, refused after).
+# Admit only this namespace, the OpenShift router (Routes) and the console (Web Terminal).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tenant-isolation
+  namespace: {{ $ns }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels: {network.openshift.io/policy-group: ingress}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: openshift-console}
 ---
 apiVersion: v1
 kind: ConfigMap

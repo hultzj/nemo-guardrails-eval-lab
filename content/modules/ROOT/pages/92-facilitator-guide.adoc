@@ -41,10 +41,11 @@ and 2 × 8 to 12 GiB.
 From a cluster-admin shell in a checkout of this repository:
 
 . Set the user list in `automation/argocd/values.yaml` (`lab.users`; the default is
-  `user1`..`user5` plus the presenter `kuro`) and name the presenters in `lab.presenters`. A
-  presenter must already have an account; `make users` never creates or resets one, and
-  `make verify` skips the participant denial checks only for the names listed there. Commit and
-  push. Argo CD deploys from the remote, not from your checkout.
+  `user1`..`user5` plus `presenter`, a regular account to present with). Present as a
+  non-admin account: a cluster-admin sees `yes` and `200` where the guide expects `no` and `403`.
+  If an existing account must be in the list anyway, name it in `lab.presenters`: `make users`
+  never creates or resets it, and `make verify` skips the participant denial checks for it.
+  Commit and push. Argo CD deploys from the remote, not from your checkout.
 . Create the participants' Keycloak accounts (`lab.users` minus `lab.presenters`) with a
   password you choose. It is never stored in git:
 +
@@ -88,7 +89,7 @@ Terminal, and run the pre-flight from xref:02-details.adoc[Prerequisites and Env
 == Day of class
 
 * Share the Showroom URL (`oc -n {showroom_namespace} get route showroom`), the console URL, and the password.
-* Presenter: run the lab as `kuro` with the live monitor on a second screen. Module 3's content-safety run is the moment to pause: the counters climb while the log scrolls.
+* Presenter: run the lab as `presenter` with the live monitor on a second screen. Module 3's content-safety run is the moment to pause: the counters climb while the log scrolls.
 * Five participants evaluating at once share four parallel slots per safety-model replica; a content-safety run then takes up to about five minutes instead of two to three.
 * If a participant's monitor shows only `ERROR` verdicts, read its pod log pane first; the cause (a typo in a ConfigMap, a missing `rails.co`) is usually there.
 * Anyone with the Showroom URL can read the guide; it contains no credentials. Tear the lab down when class ends.

@@ -14,10 +14,12 @@ lab:
   namespace: guardrails-lab-shared
   # One tenant namespace per user: <user><tenantSuffix>. OpenShift usernames, DNS-safe.
   tenantSuffix: -guardrails
-  users: [user1, user2, user3, user4, user5, kuro]
-  # Users above who present: existing accounts (kuro is cluster-admin here). `make users` never
-  # creates or resets them, and verify.sh skips the participant denial checks for them by name.
-  presenters: [kuro]
+  # Participants, plus a regular non-admin account to present with: a cluster-admin presenter sees
+  # "yes"/200 where the guide's Expected results (and participants) see "no"/403.
+  users: [user1, user2, user3, user4, user5, presenter]
+  # Existing accounts in `users` that must not be created or reset by `make users` (for example an
+  # admin who insists on presenting); verify.sh skips the participant denial checks for them by name.
+  presenters: []
   # Facilitator-owned tenant: the deterministic target of the cross-tenant denial check.
   decoyTenant: peer-demo
 

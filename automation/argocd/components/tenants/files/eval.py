@@ -12,23 +12,23 @@ import os
 import ssl
 import sys
 import time
-import urllib.error
 import urllib.request
 
-SA = "/var/run/secrets/kubernetes.io/serviceaccount"
+SA = os.environ.get("SA_DIR", "/var/run/secrets/kubernetes.io/serviceaccount")
 NS = open(f"{SA}/namespace").read().strip()
 CONFIG = os.environ.get("CONFIG_ID") or sys.exit("CONFIG_ID is required")
 RUN = os.environ.get("RUN") or f"{CONFIG}-{time.strftime('%H%M%S')}"
 DATASET = os.environ.get("DATASET", "/data/dataset.jsonl")
 URL = os.environ.get("MONITOR_URL", f"https://rails-monitor.{NS}.svc:8443") + "/v1/chat/completions"
-CTX = ssl.create_default_context(cafile=f"{SA}/service-ca.crt")
+CTX = ssl.create_default_context(cafile=f"{SA}/service-ca.crt") if URL.startswith("https") else None
 ERRORS_AS = os.environ.get("ERRORS_AS", "allowed")
 if ERRORS_AS not in ("allowed", "blocked"):
     sys.exit("ERRORS_AS must be 'allowed' or 'blocked'")
 
 STRIDE = int(os.environ.get("STRIDE", "1"))
 rows = [json.loads(line) for line in open(DATASET) if line.strip()][::max(STRIDE, 1)]
-token = open(f"{SA}/token").read().strip()
+with open(f"{SA}/token") as f:
+    token = f.read().strip()
 counts = {"TP": 0, "FP": 0, "FN": 0, "TN": 0}
 errors, wrong = 0, []
 print(f"run={RUN} config={CONFIG} prompts={len(rows)} errors_as={ERRORS_AS}", flush=True)
@@ -48,7 +48,7 @@ for i, row in enumerate(rows, 1):
         od = (out.get("guardrails") or {}).get("output_data") or {}
         verdict = "error" if not od else ("blocked" if od.get("triggered_input_rail") else "allowed")
         rail = od.get("triggered_input_rail") or ""
-    except (urllib.error.URLError, ValueError, TimeoutError) as e:
+    except Exception as e:  # refused, reset, truncated, timed out, not JSON: no verdict either way
         verdict, rail = "error", type(e).__name__
     errors += verdict == "error"
     blocked = verdict == "blocked" or (verdict == "error" and ERRORS_AS == "blocked")

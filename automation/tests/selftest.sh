@@ -15,15 +15,22 @@ bad=$(awk '$1 == "targetRevision:" {print $2}' <<<"$rendered" | grep -vx -e even
 
 # The ownership guard must cover every namespace the lab creates, not only Application destinations.
 ns=$(LIST_ONLY=1 bash automation/guard-namespaces.sh nemo-guardrails-eval-lab apps.example.com)
-for want in showroom guardrails-lab-shared user1-guardrails kuro-guardrails peer-demo-guardrails; do
+for want in showroom guardrails-lab-shared user1-guardrails presenter-guardrails peer-demo-guardrails; do
   grep -qx "$want" <<<"$ns" || fail "guard-namespaces does not check $want"
+done
+
+# Every namespace a component creates is also isolated by the tenant NetworkPolicy.
+tenants=$(helm template lab automation/argocd/components/tenants -f automation/argocd/values.yaml --set partOf=lab)
+for want in user1-guardrails presenter-guardrails peer-demo-guardrails; do
+  awk '/^kind: NetworkPolicy$/ {p = 1} p && /^  namespace: / {print $2; p = 0}' <<<"$tenants" | grep -qx "$want" ||
+    fail "no tenant-isolation NetworkPolicy in $want"
 done
 
 # make users: lab.users minus lab.presenters, and never a presenter even when named.
 users=$(DRY_RUN=1 bash automation/create-users.sh | grep '^would create')
-[[ $users == $'would create user1\nwould create user2\nwould create user3\nwould create user4\nwould create user5' ]] ||
+[[ $users == $'would create user1\nwould create user2\nwould create user3\nwould create user4\nwould create user5\nwould create presenter' ]] ||
   fail "default users: $users"
-out=$(DRY_RUN=1 bash automation/create-users.sh kuro user9)
+out=$(PRESENTERS=kuro DRY_RUN=1 bash automation/create-users.sh kuro user9)
 grep -q 'skip    kuro' <<<"$out" && grep -qx 'would create user9' <<<"$out" && ! grep -q 'would create kuro' <<<"$out" ||
   fail "explicit users: $out"
 

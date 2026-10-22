@@ -1,8 +1,9 @@
-"""Self-checks for rails-monitor: request validation, proxy + recording, and run-event ordering.
+"""Self-checks for rails-monitor: validation, proxy + recording, ordering, and the HTTP event stream.
 
 Runs the real handler on localhost against a stub guardrails server. Standard library only:
     python3 -m unittest discover -s automation/tests
 """
+import http.client
 import importlib.util
 import json
 import os
@@ -41,6 +42,28 @@ class Upstream(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
 
+class KubeAPI(BaseHTTPRequestHandler):
+    """Stub Kubernetes API: the first pod list names pod-a, later ones pod-b (a rollout)."""
+    lists = 0
+
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        if "/log?" in self.path:
+            pod = self.path.split("/pods/")[1].split("/")[0]
+            body = f"INFO: hello from {pod}\n".encode()
+        else:
+            KubeAPI.lists += 1
+            pod = "pod-a" if KubeAPI.lists == 1 else "pod-b"
+            body = json.dumps({"items": [{"metadata": {"name": pod, "creationTimestamp": "2026-01-01T00:00:00Z"},
+                                          "status": {"phase": "Running"}}]}).encode()
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
 def serve(handler):
     srv = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
@@ -55,17 +78,41 @@ class MonitorTest(unittest.TestCase):
             with open(os.path.join(cls.sa, name), "w") as f:
                 f.write(value)
         cls.upstream = serve(Upstream)
-        os.environ.update(SA_DIR=cls.sa, GUARDRAILS_URL=f"http://127.0.0.1:{cls.upstream.server_port}")
+        cls.kube = serve(KubeAPI)
+        os.environ.update(SA_DIR=cls.sa, GUARDRAILS_URL=f"http://127.0.0.1:{cls.upstream.server_port}",
+                          K8S_API=f"http://127.0.0.1:{cls.kube.server_port}")
         spec = importlib.util.spec_from_file_location("monitor", MONITOR)
         cls.m = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cls.m)
         cls.srv = serve(cls.m.Handler)
         cls.url = f"http://127.0.0.1:{cls.srv.server_port}"
+        threading.Thread(target=cls.m.follow_logs, daemon=True).start()
 
     @classmethod
     def tearDownClass(cls):
         cls.srv.shutdown()
         cls.upstream.shutdown()
+        cls.kube.shutdown()
+
+    def frames(self, until, timeout=20):
+        """Read GET /events over HTTP; return the parsed frames once until(frames) holds."""
+        conn = http.client.HTTPConnection("127.0.0.1", self.srv.server_port, timeout=timeout)
+        conn.request("GET", "/events")
+        resp = conn.getresponse()
+        self.assertEqual(resp.getheader("Content-Type"), "text/event-stream")
+        frames, kind, deadline = [], None, time.time() + timeout
+        try:
+            while time.time() < deadline:
+                line = resp.fp.readline().decode().rstrip("\n")
+                if line.startswith("event: "):
+                    kind = line[len("event: "):]
+                elif line.startswith("data: "):
+                    frames.append((kind, json.loads(line[len("data: "):])))
+                    if until(frames):
+                        return frames
+        finally:
+            conn.close()
+        self.fail(f"stream never satisfied the condition; got {frames[-5:]}")
 
     def post(self, body, headers=None):
         data = body if isinstance(body, bytes) else json.dumps(body).encode()
@@ -136,6 +183,29 @@ class MonitorTest(unittest.TestCase):
             if head == "event: run":
                 seen.append(json.loads(data[len("data: "):])["n"])
         self.assertEqual(seen, list(range(1, 51)))
+
+
+    def test_stream_delivers_run_and_decision_over_http(self):
+        def post_soon():
+            time.sleep(0.5)
+            self.post({"messages": [{"role": "user", "content": "over http"}], "guardrails": {"config_id": "cs"}},
+                      {"X-Eval-Run": "http1", "X-Eval-Label": "unsafe"})
+        threading.Thread(target=post_soon).start()
+        got = self.frames(lambda fs: any(k == "decision" and d["prompt"] == "over http" for k, d in fs))
+        self.assertTrue(any(k == "run" and d["run"] == "http1" and d["tp"] == 1 for k, d in got))
+
+    def test_every_run_survives_the_replay_limit(self):
+        for r in range(4):  # 4 runs x 50 decisions: more than the 300-frame decision replay
+            for i in range(50):
+                evt = {"verdict": "blocked", "config": "cs", "ts": 1000 + r, "prompt": f"p{i}"}
+                self.m.record(evt, "unsafe", f"hist{r}", 50, "allowed")
+                self.m.publish("decision", evt)
+        got = self.frames(lambda fs: {f"hist{r}" for r in range(4)} <= {d.get("run") for k, d in fs if k == "run"})
+        self.assertEqual({d["n"] for k, d in got if k == "run" and d["run"].startswith("hist")}, {50})
+
+    def test_log_lines_follow_the_pod_across_a_rollout(self):
+        self.frames(lambda fs: {"INFO: hello from pod-a", "INFO: hello from pod-b"} <=
+                    {d.get("line") for k, d in fs if k == "log"})
 
 
 if __name__ == "__main__":

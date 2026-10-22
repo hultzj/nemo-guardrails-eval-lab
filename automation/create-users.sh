@@ -14,7 +14,7 @@ KC_POD=${KC_POD:-keycloak-0}
 REALM=${REALM:-openshift}
 requested=("$@")
 [[ ${#requested[@]} -gt 0 ]] || read -ra requested <<<"$(list users)"
-presenters=" $(list presenters) "
+presenters=" ${PRESENTERS-$(list presenters)} "
 users=()
 for u in "${requested[@]}"; do
   [[ $u =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "invalid username: $u" >&2; exit 1; }
