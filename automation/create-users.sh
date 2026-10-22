@@ -1,19 +1,29 @@
 #!/usr/bin/env bash
 # Create (or reset) the lab's Keycloak users in the realm OpenShift logs in through.
 # Usage: LAB_USER_PASSWORD='<choose one>' bash automation/create-users.sh [user1 user2 ...]
+# Without arguments: lab.users from argocd/values.yaml. Users in lab.presenters are always skipped:
+# they are existing accounts, and this script would reset their password.
 # The password is never stored in git; hand it to attendees on the day.
 set -euo pipefail
 
-: "${LAB_USER_PASSWORD:?set LAB_USER_PASSWORD to the password attendees will use}"
+VALUES="$(cd "$(dirname "$0")" && pwd)/argocd/values.yaml"
+list() { sed -n "s/^  $1: \[\(.*\)\]/\1/p" "$VALUES" | tr -d ' ' | tr ',' ' '; }
+
 KC_NS=${KC_NS:-keycloak}
 KC_POD=${KC_POD:-keycloak-0}
 REALM=${REALM:-openshift}
-users=("$@")
-[[ ${#users[@]} -gt 0 ]] || users=(user1 user2 user3 user4 user5)
-for u in "${users[@]}"; do
+requested=("$@")
+[[ ${#requested[@]} -gt 0 ]] || read -ra requested <<<"$(list users)"
+presenters=" $(list presenters) "
+users=()
+for u in "${requested[@]}"; do
   [[ $u =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "invalid username: $u" >&2; exit 1; }
+  if [[ $presenters == *" $u "* ]]; then echo "skip    $u (presenter: existing account, not reset)"; else users+=("$u"); fi
 done
+[[ ${#users[@]} -gt 0 ]] || { echo "no participant users to create" >&2; exit 1; }
+if [[ -n ${DRY_RUN:-} ]]; then printf 'would create %s\n' "${users[@]}"; exit 0; fi  # for automation/tests/selftest.sh
 
+: "${LAB_USER_PASSWORD:?set LAB_USER_PASSWORD to the password attendees will use}"
 admin_user=$(oc -n "$KC_NS" get secret keycloak-initial-admin -o jsonpath='{.data.username}' | base64 -d)
 admin_pass=$(oc -n "$KC_NS" get secret keycloak-initial-admin -o jsonpath='{.data.password}' | base64 -d)
 

@@ -192,6 +192,11 @@ spec:
           image: {{ $.Values.images.python }}
           command: ["python3", "-u", "/app/monitor.py"]
           volumeMounts: [{name: app, mountPath: /app}]
+          # The app listens on 127.0.0.1 only, so the kubelet cannot probe it over HTTP.
+          readinessProbe:
+            exec:
+              command: ["python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=2)"]
+            periodSeconds: 10
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
           resources:
             requests: {cpu: 20m, memory: 64Mi}

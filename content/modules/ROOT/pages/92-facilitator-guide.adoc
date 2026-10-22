@@ -41,9 +41,12 @@ and 2 × 8 to 12 GiB.
 From a cluster-admin shell in a checkout of this repository:
 
 . Set the user list in `automation/argocd/values.yaml` (`lab.users`; the default is
-  `user1`..`user5` plus the presenter `kuro`), commit and push it. Argo CD deploys from the
-  remote, not from your checkout.
-. Create the Keycloak users with a password you choose. It is never stored in git:
+  `user1`..`user5` plus the presenter `kuro`) and name the presenters in `lab.presenters`. A
+  presenter must already have an account; `make users` never creates or resets one, and
+  `make verify` skips the participant denial checks only for the names listed there. Commit and
+  push. Argo CD deploys from the remote, not from your checkout.
+. Create the participants' Keycloak accounts (`lab.users` minus `lab.presenters`) with a
+  password you choose. It is never stored in git:
 +
 [source,bash]
 ----
@@ -56,6 +59,10 @@ LAB_USER_PASSWORD='<choose one>' make -C automation users
 make -C automation bootstrap
 make -C automation status
 ----
+
+`bootstrap` first refuses to run if any namespace the lab would create already exists without
+this lab's label. To deploy a different branch, `make -C automation bootstrap REVISION=<branch>`:
+the parent, the components and the Showroom guide all follow it.
 
 Repeat `status` until every Application shows `Synced` and `Healthy`. The safety model takes
 a few minutes on first start while it downloads and verifies the model file.

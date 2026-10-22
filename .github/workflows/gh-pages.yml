@@ -27,6 +27,11 @@ jobs:
       - run: npm run build
       - name: lab contract (strict; red until every step is verified live)
         run: bash scripts/check-lab.sh
+      - uses: azure/setup-helm@v4
+      - name: automation self-checks (monitor unit tests, chart and script checks)
+        run: |
+          python3 -m unittest discover -s automation/tests
+          bash automation/tests/selftest.sh
       - if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v4
         with:

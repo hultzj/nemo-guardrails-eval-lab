@@ -15,6 +15,9 @@ lab:
   # One tenant namespace per user: <user><tenantSuffix>. OpenShift usernames, DNS-safe.
   tenantSuffix: -guardrails
   users: [user1, user2, user3, user4, user5, kuro]
+  # Users above who present: existing accounts (kuro is cluster-admin here). `make users` never
+  # creates or resets them, and verify.sh skips the participant denial checks for them by name.
+  presenters: [kuro]
   # Facilitator-owned tenant: the deterministic target of the cross-tenant denial check.
   decoyTenant: peer-demo
 

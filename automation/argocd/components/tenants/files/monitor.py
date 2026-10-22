@@ -8,6 +8,7 @@ counters per run. Standard library only. Listens on 127.0.0.1: the oauth-proxy s
 only way in.
 """
 import collections
+import functools
 import json
 import os
 import queue
@@ -18,16 +19,15 @@ import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-SA = "/var/run/secrets/kubernetes.io/serviceaccount"
-NS = open(f"{SA}/namespace").read().strip()
+SA = os.environ.get("SA_DIR", "/var/run/secrets/kubernetes.io/serviceaccount")
+NS = os.environ.get("POD_NAMESPACE") or open(f"{SA}/namespace").read().strip()
 NAME = os.environ.get("GUARDRAILS_NAME", "nemoguardrails")
 UPSTREAM = os.environ.get("GUARDRAILS_URL", f"https://{NAME}.{NS}.svc")
 HERE = os.path.dirname(os.path.abspath(__file__))
-SVC_CTX = ssl.create_default_context(cafile=f"{SA}/service-ca.crt")
-API_CTX = ssl.create_default_context(cafile=f"{SA}/ca.crt")
 API = "https://kubernetes.default.svc"
 
-lock = threading.Lock()
+# Reentrant: record() publishes while holding it, so run snapshots reach browsers in order.
+lock = threading.RLock()
 events = collections.deque(maxlen=300)  # decisions and runs, replayed to each new browser
 log_tail = collections.deque(maxlen=60)  # recent log lines, replayed too
 runs = {}  # run id -> counters
@@ -36,6 +36,11 @@ subscribers = []
 
 def token():
     return open(f"{SA}/token").read().strip()  # re-read: the kubelet rotates it
+
+
+@functools.lru_cache(maxsize=None)
+def tls(cafile):
+    return ssl.create_default_context(cafile=f"{SA}/{cafile}")
 
 
 def publish(kind, data):
@@ -79,8 +84,7 @@ def record(evt, label, run, total, errors_as):
         r["n"] += 1
         r["errors"] += evt["verdict"] == "error"
         evt["outcome"] = key.upper()
-        snapshot = dict(r)
-    publish("run", snapshot)
+        publish("run", dict(r))  # under the lock: a later snapshot never overtakes an earlier one
 
 
 def follow_logs():
@@ -90,7 +94,7 @@ def follow_logs():
             req = urllib.request.Request(
                 f"{API}/api/v1/namespaces/{NS}/pods?labelSelector=app%3D{NAME}",
                 headers={"Authorization": f"Bearer {token()}"})
-            pods = json.load(urllib.request.urlopen(req, context=API_CTX, timeout=10))["items"]
+            pods = json.load(urllib.request.urlopen(req, context=tls("ca.crt"), timeout=10))["items"]
             running = [p for p in pods if p["status"].get("phase") == "Running"
                        and not p["metadata"].get("deletionTimestamp")]
             if not running:
@@ -101,7 +105,7 @@ def follow_logs():
             req = urllib.request.Request(
                 f"{API}/api/v1/namespaces/{NS}/pods/{pod}/log?container=nemo-guardrails&follow=true&tailLines=15",
                 headers={"Authorization": f"Bearer {token()}"})
-            with urllib.request.urlopen(req, context=API_CTX, timeout=3600) as resp:
+            with urllib.request.urlopen(req, context=tls("ca.crt"), timeout=3600) as resp:
                 for raw in resp:
                     line = raw.decode(errors="replace").rstrip()
                     if '"GET / HTTP' not in line:  # kubelet probes, every few seconds
@@ -174,19 +178,24 @@ class Handler(BaseHTTPRequestHandler):
             req = json.loads(raw or b"{}")
         except ValueError:
             return self.send(400, {"error": "body is not JSON"})
-        gr = req.setdefault("guardrails", {}) if isinstance(req, dict) else {}
+        if not isinstance(req, dict) or not isinstance(req.setdefault("guardrails", {}), dict):
+            return self.send(400, {"error": "body and its 'guardrails' field must be JSON objects"})
+        gr = req["guardrails"]
         if self.path.endswith("/chat/completions"):  # ask for the verdict details the page shows
             opts = gr.setdefault("options", {})
+            if not isinstance(opts, dict) or not isinstance(opts.setdefault("log", {}), dict):
+                return self.send(400, {"error": "'guardrails.options' and its 'log' must be JSON objects"})
             opts.setdefault("output_vars", True)
-            opts.setdefault("log", {}).setdefault("activated_rails", True)
-        prompt = next((m.get("content", "") for m in reversed(req.get("messages") or [])
-                       if isinstance(m, dict) and m.get("role") == "user"), "") if isinstance(req, dict) else ""
+            opts["log"].setdefault("activated_rails", True)
+        msgs = req.get("messages") if isinstance(req.get("messages"), list) else []
+        prompt = next((m.get("content", "") for m in reversed(msgs)
+                       if isinstance(m, dict) and m.get("role") == "user"), "")
         started = time.time()
         try:
             up = urllib.request.urlopen(urllib.request.Request(
                 UPSTREAM + self.path, json.dumps(req).encode(),
                 {"Content-Type": "application/json", "Authorization": f"Bearer {token()}"}),
-                context=SVC_CTX, timeout=60)
+                context=tls("service-ca.crt") if UPSTREAM.startswith("https") else None, timeout=60)
             status, payload = up.status, up.read()
         except urllib.error.HTTPError as e:
             status, payload = e.code, e.read()

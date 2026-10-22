@@ -11,7 +11,8 @@ SUFFIX=${SUFFIX:--guardrails}
 DECOY_NS=${DECOY_NS:-peer-demo$SUFFIX}
 # The parent Application name; children are named <LAB_APP>-<component>.
 LAB_APP=${LAB_APP:-nemo-guardrails-eval-lab}
-USERS=${USERS:-$(sed -n 's/^  users: \[\(.*\)\]/\1/p' "$VALUES" | tr -d ' ' | tr ',' ' ')}
+USERS=${USERS-$(sed -n 's/^  users: \[\(.*\)\]/\1/p' "$VALUES" | tr -d ' ' | tr ',' ' ')}
+PRESENTERS=${PRESENTERS-$(sed -n 's/^  presenters: \[\(.*\)\]/\1/p' "$VALUES" | tr -d ' ' | tr ',' ' ')}
 failed=0
 
 check() {
@@ -66,6 +67,17 @@ route_refuses_anonymous() {
   [[ $code == 401 || $code == 403 || $code == 302 ]]
 }
 
+# The dashboard end to end, as the eval Job reaches it: Route -> oauth-proxy (bearer token, SAR) ->
+# monitor app. /healthz must come from the Python app, /events must open an SSE stream.
+dashboard_answers() {
+  local ns=$1 host tok
+  host=$(oc -n "$ns" get route rails-monitor -o jsonpath='{.spec.host}') || return 1
+  tok=$(oc -n "$ns" create token eval-runner --duration=10m) || return 1
+  curl -fsk --max-time 10 -H "Authorization: Bearer $tok" "https://$host/healthz" | grep -q '"ok": true' || return 1
+  { curl -sk --max-time 3 -o /dev/null -D - -H "Authorization: Bearer $tok" "https://$host/events" || true; } |
+    grep -qi '^content-type: text/event-stream'
+}
+
 oauth_proxy_matches_cluster() {
   local want have
   want=$(oc -n openshift get is oauth-proxy -o jsonpath='{.status.tags[0].items[0].dockerImageReference}') || return 1
@@ -97,12 +109,15 @@ for u in $USERS; do
   ns="$u$SUFFIX"
   check "$u: rails-monitor rolled out" oc -n "$ns" rollout status deploy/rails-monitor --timeout=10s
   check "$u: rails-monitor route refuses anonymous callers" route_refuses_anonymous "$ns" rails-monitor
+  check "$u: live dashboard answers an authorized caller (health + event stream)" dashboard_answers "$ns"
   check "$u: can create nemoguardrails" can "$u" create nemoguardrails.trustyai.opendatahub.io -n "$ns"
   check "$u: can create configmaps and jobs" bash -c "$(declare -f as_user can); can $u create configmaps -n $ns && can $u create jobs.batch -n $ns"
-  # A cluster-admin presenter (kuro on the test cluster) may do anything; denials apply to participants.
-  if can "$u" '*' '*' --all-namespaces; then
-    echo "SKIP: $u: is cluster-admin; participant denial checks do not apply"
+  # Presenters are named in lab.presenters, never inferred from their privileges: a participant who
+  # was accidentally given cluster-admin must fail here, not be skipped.
+  if [[ " $PRESENTERS " == *" $u "* ]]; then
+    echo "SKIP: $u: listed in lab.presenters; participant denial checks do not apply"
   else
+    check "$u: is not cluster-admin" cannot "$u" '*' '*' --all-namespaces
     check "$u: cannot read secrets" cannot "$u" get secrets -n "$ns"
     check "$u: cannot create nemoguardrails in the decoy tenant" cannot "$u" create nemoguardrails.trustyai.opendatahub.io -n "$DECOY_NS"
   fi

@@ -19,6 +19,9 @@ spec:
     path: automation/argocd
     helm:
       valuesObject:
+        # The children and the Showroom guide follow the same revision as this parent.
+        gitops:
+          revision: GIT_REVISION
         deployer:
           domain: DEPLOYER_DOMAIN
   destination:

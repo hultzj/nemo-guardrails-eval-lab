@@ -17,20 +17,17 @@ help:
 	  '  make verify      PASS/FAIL readiness checks for class' \
 	  '  make teardown    Delete the lab Applications and everything they created'
 
-# bootstrap guards every namespace a child Application deploys into (Argo CD would adopt a foreign one,
-# and teardown would delete it), then creates and labels the Showroom namespace, which the upstream
+# bootstrap refuses any namespace the lab would deploy into or create (Application destinations and
+# every Namespace a component renders) that exists without this lab's label: Argo CD would adopt it,
+# and teardown would delete it. Then it creates and labels the Showroom namespace, which the upstream
 # chart creates unlabeled, so Argo CD may deploy there. No comments inside the recipe: after
 # backslash-newline joining, a shell comment would swallow the rest of it.
 bootstrap:
 	@set -euo pipefail; \
 	[[ "$(REVISION)" =~ ^[A-Za-z0-9._/-]+$$ ]] || { echo "REVISION '$(REVISION)' has unsafe characters" >&2; exit 1; }; \
 	domain=$$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}'); test -n "$$domain"; \
+	bash "$(AUTOMATION_DIR)/guard-namespaces.sh" "$(LAB_APP)" "$$domain"; \
 	apps=$$(helm template "$(LAB_APP)" "$(AUTOMATION_DIR)/argocd" --set deployer.domain="$$domain"); \
-	for ns in $$(awk '$$1 == "destination:" {d = 1} d && $$1 == "namespace:" {print $$2; d = 0}' <<<"$$apps" | sort -u); do \
-	  state=$$(oc get namespace "$$ns" --ignore-not-found -o jsonpath='{.metadata.name}/{.metadata.labels.app\.kubernetes\.io/part-of}'); \
-	  case "$$state" in ""|"$$ns/$(LAB_APP)") ;; \
-	    *) echo "namespace $$ns exists and is not this lab's ($(LAB_APP)); rename it in values.yaml" >&2; exit 1 ;; esac; \
-	done; \
 	sns=$$(awk -v app="$(LAB_APP)-showroom" '$$1 == "name:" && $$2 == app {f = 1} f && $$1 == "destination:" {d = 1} f && d && $$1 == "namespace:" {print $$2; exit}' <<<"$$apps"); \
 	if [[ -n "$$sns" ]]; then \
 	  oc create namespace "$$sns" --dry-run=client -o yaml | oc apply -f -; \
@@ -38,6 +35,7 @@ bootstrap:
 	fi; \
 	sed "s|DEPLOYER_DOMAIN|$$domain|; s|GIT_REVISION|$(REVISION)|" "$(AUTOMATION_DIR)/bootstrap.yaml" | oc apply -f -
 
+# Participants from lab.users, minus lab.presenters (existing accounts that must not be reset).
 users:
 	bash "$(AUTOMATION_DIR)/create-users.sh" $(USERS)
 

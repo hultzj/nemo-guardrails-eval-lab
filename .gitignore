@@ -5,3 +5,4 @@ evidence/
 .xreview/
 __pycache__/
 *.pyc
+.xreview.toml
