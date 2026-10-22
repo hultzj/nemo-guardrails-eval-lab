@@ -37,10 +37,17 @@ rules:
   - apiGroups: [batch]
     resources: [jobs]
     verbs: [get, list, watch, create, delete]
-  # Web Terminal: the console creates the participant's terminal workspace in this project.
+  # Web Terminal: the console creates the participant's terminal workspace in this project, and its
+  # exec sidecar sets up the terminal by exec'ing into it as the participant ("Failed to create
+  # kubeconfig in pod" without pods/exec, verified). Exec reaches only this namespace's pods, whose
+  # ServiceAccounts can do less than the participant; the DevWorkspace webhook still limits exec
+  # into a terminal pod to its creator.
   - apiGroups: [workspace.devfile.io]
     resources: [devworkspaces, devworkspacetemplates]
     verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [""]
+    resources: [pods/exec]
+    verbs: [get, create]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

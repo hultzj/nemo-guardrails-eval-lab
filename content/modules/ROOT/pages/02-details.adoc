@@ -7,7 +7,7 @@
 | If you are… | You need
 
 | Every participant
-| A username and password from the facilitator, a browser, and the OpenShift Console tab.
+| A username and password from the facilitator and a browser. The *OpenShift Console* tab opens the console in a new browser tab.
 Commands run in the console's Web Terminal (or your own `oc` and `jq`, logged in as yourself).
 
 | A presenter
@@ -21,11 +21,11 @@ Provided by the facilitator:
 * The shared safety model in `{lab_namespace}`.
 
 You act as *your own OpenShift user* throughout. In your namespace you can read everything
-except Secrets, and you can create ConfigMaps, `NemoGuardrails` resources and Jobs. Nothing else.
+except Secrets, and you can create ConfigMaps, `NemoGuardrails` resources and Jobs, and open a terminal (exec) into pods. Nothing else.
 
 == Open a terminal
 
-. In the OpenShift Console tab, log in with *keycloak* and your username and password.
+. Click the *OpenShift Console* tab (it opens a new browser tab) and log in with *keycloak* and your username and password.
 . Click the terminal icon (*>_*) in the console masthead.
 . If asked for a project, choose `<your username>{tenant_suffix}` and click *Start*.
 

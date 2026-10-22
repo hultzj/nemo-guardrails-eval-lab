@@ -11,5 +11,7 @@ view_switcher:
 # No Terminal tab: the Showroom URL has no login, and participants work as their own
 # OpenShift users (shared cluster), in the console's Web Terminal.
 tabs:
+  # The console refuses to be framed; Showroom opens an external tab in a new browser tab.
   - name: OpenShift Console
     url: 'https://console-openshift-console.${DOMAIN}'
+    external: true
