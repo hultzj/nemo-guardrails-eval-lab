@@ -145,7 +145,8 @@ Expected result:
 | fails closed: nothing harmful gets through, and every legitimate user is refused
 |===
 
-The table shows the two runs with `errors` 10 each. The chart has one full bar per client: the
+Each summary ends with `WARNING: 10 of 10 prompts got no verdict ...`: here that is the point, since
+you broke the safety model on purpose. The table shows the two runs with `errors` 10 each. The chart has one full bar per client: the
 fail-open client lets every unsafe prompt through (FNR 1.0) and refuses no one; the fail-closed
 client refuses every legitimate user (FPR 1.0) and lets nothing unsafe through. Each run takes
 about 10 seconds: without a model to wait for, errors come back fast.
