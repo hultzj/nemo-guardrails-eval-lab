@@ -60,14 +60,14 @@ done
 echo "get pods/log: $(oc auth can-i get pods --subresource=log -n $NS)"
 echo "get secrets: $(oc auth can-i get secrets -n $NS)"
 echo "create in {decoy_namespace}: $(oc auth can-i create configmaps -n {decoy_namespace})"
-ls ~/nemo-guardrails-eval-lab/notebooks
+git -C ~/nemo-guardrails-eval-lab ls-files notebooks
 ----
 
 Expected result: `oc whoami` prints `system:serviceaccount:<your username>{tenant_suffix}:guardrails-lab`,
 the namespace is `Active`, the two `create` lines and `get pods/log` print `yes`, `get secrets` and
 the create in another tenant's project print `no`, `lab files at main: <commit> <message>` names
-the fetched commit, and the notebooks folder lists
-`03-evaluate.ipynb`, `04-tune-and-break.ipynb`, `dataset.jsonl` and `labeval.py`. The `no` lines are
+the fetched commit, and the last command lists `notebooks/03-evaluate.ipynb`,
+`notebooks/04-tune-and-break.ipynb`, `notebooks/dataset.jsonl` and `notebooks/labeval.py`. The `no` lines are
 the point: the lab grants exactly what the exercises need.
 
 The first line sets up a new terminal; re-run it whenever you open another terminal tab.
