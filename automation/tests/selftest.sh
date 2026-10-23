@@ -33,6 +33,10 @@ grep -B1 -A1 'app.kubernetes.io/name: devworkspace-controller' <<<"$tenants" | g
 [[ $(grep -c 'kubernetes.io/metadata.name: openshift-operators' <<<"$tenants") -eq $(grep -c 'app.kubernetes.io/name: devworkspace-controller' <<<"$tenants") ]] ||
   fail "openshift-operators admitted without the controller pod selector"
 
+# Teardown must keep the Web Terminal Subscription, or the next bootstrap cannot adopt the CSV.
+helm template lab automation/argocd/components/web-terminal -f automation/argocd/values.yaml |
+  grep -q 'argocd.argoproj.io/sync-options: Delete=false' || fail "web-terminal Subscription lacks Delete=false"
+
 # make users: lab.users minus lab.presenters, never a presenter even when named, and a distinct
 # password per user (a shared one would let attendees log in as each other).
 created=$(DRY_RUN=1 bash automation/create-users.sh | grep '^would create')

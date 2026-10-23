@@ -5,6 +5,11 @@ kind: Subscription
 metadata:
   name: web-terminal
   namespace: openshift-operators
+  annotations:
+    # Teardown keeps this Subscription: deleting it leaves the operator's CSV behind, and a new
+    # Subscription cannot adopt that CSV (ResolutionFailed: ConstraintsNotSatisfiable, verified), so
+    # the next bootstrap would fail. Kept, the next bootstrap adopts it. Removal: see the cleanup page.
+    argocd.argoproj.io/sync-options: Delete=false
 spec:
   channel: fast
   name: web-terminal
