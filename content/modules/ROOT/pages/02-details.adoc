@@ -38,15 +38,20 @@ file browser on the left.
 
 == Get the lab files and run the pre-flight check
 
-In JupyterLab choose *File > New > Terminal*. Run the block below in that terminal: it copies the
-lab's notebooks onto your workbench's storage (they survive a workbench restart), from the same
-repository and revision the lab was deployed from (`$LAB_GIT_URL`, `$LAB_GIT_REVISION`), and checks
-what the workbench may do.
+In JupyterLab choose *File > New > Terminal*. Run the block below in that terminal: it fetches the
+lab files onto your workbench's storage (they survive a workbench restart), from the repository
+and revision the lab was deployed from (the `lab-source` ConfigMap in your project), and checks
+what the workbench may do. Re-running it updates the files to that revision; git refuses, and
+changes nothing, if you have edited a lab file.
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-cd ~ && { [ -d nemo-guardrails-eval-lab ] || git clone -q -b "$LAB_GIT_REVISION" "$LAB_GIT_URL" nemo-guardrails-eval-lab; }
 NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+REPO=$(oc -n $NS get configmap lab-source -o jsonpath='{.data.repoUrl}')
+REV=$(oc -n $NS get configmap lab-source -o jsonpath='{.data.revision}')
+mkdir -p ~/nemo-guardrails-eval-lab && cd ~/nemo-guardrails-eval-lab && { [ -d .git ] || git init -q; }
+git fetch -q --depth 1 "$REPO" "$REV" && git checkout -q --detach FETCH_HEAD && echo "lab files at $REV: $(git log --oneline -1)"
+cd ~
 oc whoami
 oc get namespace $NS
 for r in nemoguardrails.trustyai.opendatahub.io configmaps; do
@@ -60,11 +65,12 @@ ls ~/nemo-guardrails-eval-lab/notebooks
 
 Expected result: `oc whoami` prints `system:serviceaccount:<your username>{tenant_suffix}:guardrails-lab`,
 the namespace is `Active`, the two `create` lines and `get pods/log` print `yes`, `get secrets` and
-the create in another tenant's project print `no`, and the notebooks folder lists
+the create in another tenant's project print `no`, `lab files at main: <commit> <message>` names
+the fetched commit, and the notebooks folder lists
 `03-evaluate.ipynb`, `04-tune-and-break.ipynb`, `dataset.jsonl` and `labeval.py`. The `no` lines are
 the point: the lab grants exactly what the exercises need.
 
-The first two lines set up a new terminal; re-run them whenever you open another terminal tab.
+The first line sets up a new terminal; re-run it whenever you open another terminal tab.
 
 == Access details
 

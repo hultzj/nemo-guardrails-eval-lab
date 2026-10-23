@@ -91,6 +91,26 @@ def evaluate(config, rows, errors_as="allowed", run=None, url=None, progress=pri
             "counts": counts, "errors": errors, "metrics": metrics(counts)}
 
 
+def monitor_runs(url=None):
+    """The live monitor's own tallies, by run id (it counted every request sent through it)."""
+    url = url or monitor_url()
+    req = urllib.request.Request(url + "/api/runs", headers={"Authorization": f"Bearer {token()}"})
+    ctx = ssl.create_default_context(cafile=f"{SA}/service-ca.crt") if url.startswith("https") else None
+    return {r["run"]: r for r in json.load(urllib.request.urlopen(req, context=ctx, timeout=30))}
+
+
+def latest_run(runs, config, n):
+    """The newest complete run of `config` (n prompts) the monitor remembers, shaped like evaluate()'s
+    result; None if there is none (for example, the monitor restarted since)."""
+    done = [r for r in runs.values() if r["config"] == config and r["n"] == n]
+    if not done:
+        return None
+    r = max(done, key=lambda r: r["started"])
+    counts = {k: r[k.lower()] for k in ("TP", "FP", "FN", "TN")}
+    return {"run": r["run"], "config": config, "errors_as": r.get("errors_as", "allowed"),
+            "counts": counts, "errors": r["errors"], "metrics": metrics(counts), "results": []}
+
+
 def summary(res):
     c, m = res["counts"], res["metrics"]
     return (f"=== {res['run']} (config {res['config']}, errors counted as {res['errors_as']}) ===\n"

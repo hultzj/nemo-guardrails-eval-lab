@@ -26,11 +26,26 @@ ROWS = {"s-allow": ("safe", "allowed"), "s-block": ("safe", "blocked"), "s-miss"
         "u-miss": ("unsafe", "no-verdict"), "u-drop": ("unsafe", "dropped")}
 
 
+RUNS = [  # what GET /api/runs returns: two complete content-safety runs, one partial, one other config
+    {"run": "cs-old", "config": "content-safety", "n": 8, "started": 1, "tp": 1, "fp": 1, "fn": 1, "tn": 5, "errors": 0},
+    {"run": "cs-new", "config": "content-safety", "n": 8, "started": 3, "tp": 2, "fp": 1, "fn": 0, "tn": 5, "errors": 0, "errors_as": "allowed"},
+    {"run": "cs-partial", "config": "content-safety", "n": 3, "started": 4, "tp": 1, "fp": 0, "fn": 0, "tn": 2, "errors": 0},
+    {"run": "rx", "config": "regex-only", "n": 8, "started": 5, "tp": 0, "fp": 1, "fn": 2, "tn": 5, "errors": 0},
+]
+
+
 class Monitor(BaseHTTPRequestHandler):
     headers_seen = []
 
     def log_message(self, *args):
         pass
+
+    def do_GET(self):  # /api/runs
+        data = json.dumps(RUNS).encode()
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
@@ -106,6 +121,28 @@ class EvalTest(unittest.TestCase):
         self.assertAlmostEqual(res["metrics"]["recall"], 0.25)
         self.assertEqual({r["outcome"] for r in res["results"] if r["id"] == "u-drop"}, {"FN"})
         self.assertEqual(len(lab.load_rows(self.dataset, stride=4)), 2)
+
+
+    def lab(self):
+        os.environ["SA_DIR"] = self.dir
+        spec = importlib.util.spec_from_file_location("labeval", EVAL)
+        lab = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(lab)
+        return lab
+
+    def test_baseline_is_the_newest_complete_run(self):
+        lab = self.lab()
+        runs = lab.monitor_runs(f"http://127.0.0.1:{self.srv.server_port}")
+        self.assertEqual(set(runs), {"cs-old", "cs-new", "cs-partial", "rx"})
+        base = lab.latest_run(runs, "content-safety", 8)
+        self.assertEqual(base["run"], "cs-new")  # newest complete: not the partial, not another config
+        self.assertEqual(base["counts"], {"TP": 2, "FP": 1, "FN": 0, "TN": 5})
+        self.assertAlmostEqual(base["metrics"]["precision"], 2 / 3)
+
+    def test_no_baseline_after_a_monitor_restart(self):
+        lab = self.lab()
+        self.assertIsNone(lab.latest_run({}, "content-safety", 8))  # the notebook then re-measures
+        self.assertIsNone(lab.latest_run({"rx": RUNS[3]}, "content-safety", 8))
 
 
 if __name__ == "__main__":

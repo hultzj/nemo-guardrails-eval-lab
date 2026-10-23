@@ -230,6 +230,18 @@ spec:
   port: {targetPort: https}
   tls: {termination: reencrypt, insecureEdgeTerminationPolicy: Redirect}
 ---
+# Where the workbench gets the lab files: the repo and revision this deployment comes from. A
+# ConfigMap Argo CD keeps current (the Notebook pod spec is ignored after creation), read by the
+# pre-flight in the guide; a branch, tag or commit all work.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lab-source
+  namespace: {{ $ns }}
+data:
+  repoUrl: {{ required "gitops.repoUrl is required" $.Values.gitops.repoUrl | quote }}
+  revision: {{ required "gitops.revision is required" $.Values.gitops.revision | quote }}
+---
 # The participant's workbench: JupyterLab (terminal + notebooks) in this Data Science Project. Its
 # ServiceAccount carries the participant's permissions (bindings above), so `oc` in its terminal and
 # the notebooks act within this namespace only.
@@ -294,9 +306,6 @@ spec:
                 --ServerApp.base_url=/notebook/{{ $ns }}/guardrails-lab
                 --ServerApp.quit_button=False
             - {name: JUPYTER_IMAGE, value: {{ $.Values.images.workbench | quote }}}
-            # The lab files to clone: the same repo and revision this deployment comes from.
-            - {name: LAB_GIT_URL, value: {{ required "gitops.repoUrl is required" $.Values.gitops.repoUrl | quote }}}
-            - {name: LAB_GIT_REVISION, value: {{ required "gitops.revision is required" $.Values.gitops.revision | quote }}}
           ports:
             - {name: notebook-port, containerPort: 8888, protocol: TCP}
           livenessProbe:

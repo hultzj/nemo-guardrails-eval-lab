@@ -46,10 +46,21 @@ grep -q 'RespectIgnoreDifferences=true' <<<"$tenants_app" ||
 # The workbench clones the lab files from the deployed repo and revision.
 grep -q 'revision: "event-x"' <<<"$tenants_app" || fail "parent does not pass gitops.revision to tenants"
 wb=$(helm template lab automation/argocd/components/tenants -f automation/argocd/values.yaml --set partOf=lab --set gitops.revision=event-x)
-grep -q '{name: LAB_GIT_REVISION, value: "event-x"}' <<<"$wb" || fail "workbench LAB_GIT_REVISION does not follow gitops.revision"
-grep -q "{name: LAB_GIT_URL, value: \"$(sed -n 's/^  repoUrl: //p' automation/argocd/values.yaml)\"}" <<<"$wb" || fail "workbench LAB_GIT_URL is not gitops.repoUrl"
-grep -q 'git clone -q -b "$LAB_GIT_REVISION" "$LAB_GIT_URL"' content/modules/ROOT/pages/02-details.adoc ||
-  fail "the guide does not clone the deployed revision"
+src=$(sed -n '/name: lab-source$/,/^---$/p' <<<"$wb" | grep -E '^  (repoUrl|revision):')
+[[ $src == *'revision: "event-x"'* ]] || fail "lab-source revision does not follow gitops.revision"
+[[ $src == *"repoUrl: \"$(sed -n 's/^  repoUrl: //p' automation/argocd/values.yaml)\""* ]] || fail "lab-source repoUrl is not gitops.repoUrl"
+grep -q 'git fetch -q --depth 1 "$REPO" "$REV" && git checkout -q --detach FETCH_HEAD' content/modules/ROOT/pages/02-details.adoc ||
+  fail "the guide does not fetch the deployed revision"
+# ... and that fetch works for a branch, a tag-like ref and a bare commit, into a new or existing checkout.
+tmp=$(mktemp -d); git init -q "$tmp/src"; git -C "$tmp/src" -c user.email=t@t -c user.name=t commit -q --allow-empty -m one
+sha1=$(git -C "$tmp/src" rev-parse HEAD); git -C "$tmp/src" -c user.email=t@t -c user.name=t commit -q --allow-empty -m two
+git -C "$tmp/src" config uploadpack.allowReachableSHA1InWant true
+for rev in "$(git -C "$tmp/src" branch --show-current)" "$sha1"; do
+  ( mkdir -p "$tmp/wb" && cd "$tmp/wb" && { [ -d .git ] || git init -q; } &&
+    git fetch -q --depth 1 "file://$tmp/src" "$rev" && git checkout -q --detach FETCH_HEAD ) || fail "fetch of $rev failed"
+done
+[[ $(git -C "$tmp/wb" rev-parse HEAD) == "$sha1" ]] || fail "existing checkout did not move to the pinned commit"
+rm -rf "$tmp"
 
 # make users: lab.users minus lab.presenters, never a presenter even when named, and a distinct
 # password per user (a shared one would let attendees log in as each other).
