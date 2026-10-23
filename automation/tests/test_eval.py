@@ -31,6 +31,8 @@ RUNS = [  # what GET /api/runs returns: two complete content-safety runs, one pa
     {"run": "cs-new", "config": "content-safety", "n": 8, "started": 3, "tp": 2, "fp": 1, "fn": 0, "tn": 5, "errors": 0, "errors_as": "allowed"},
     {"run": "cs-partial", "config": "content-safety", "n": 3, "started": 4, "tp": 1, "fp": 0, "fn": 0, "tn": 2, "errors": 0},
     {"run": "rx", "config": "regex-only", "n": 8, "started": 5, "tp": 0, "fp": 1, "fn": 2, "tn": 5, "errors": 0},
+    # complete and newer than cs-new, but every prompt got no verdict: measured nothing
+    {"run": "cs-errored", "config": "content-safety", "n": 8, "started": 5, "tp": 0, "fp": 0, "fn": 2, "tn": 6, "errors": 8},
     # newest, 8 prompts counted so far, but a run of 16: not a complete 8-prompt baseline
     {"run": "cs-bigger", "config": "content-safety", "n": 8, "total": 16, "started": 6, "tp": 2, "fp": 0, "fn": 0, "tn": 6, "errors": 0},
 ]
@@ -135,9 +137,9 @@ class EvalTest(unittest.TestCase):
     def test_baseline_is_the_newest_complete_run(self):
         lab = self.lab()
         runs = lab.monitor_runs(f"http://127.0.0.1:{self.srv.server_port}")
-        self.assertEqual(set(runs), {"cs-old", "cs-new", "cs-partial", "rx", "cs-bigger"})
+        self.assertEqual(set(runs), {"cs-old", "cs-new", "cs-partial", "rx", "cs-bigger", "cs-errored"})
         base = lab.latest_run(runs, "content-safety", 8)
-        self.assertEqual(base["run"], "cs-new")  # newest complete: not partial, not a larger run, not another config
+        self.assertEqual(base["run"], "cs-new")  # newest complete: not partial, larger, errored, or another config
         self.assertEqual(base["counts"], {"TP": 2, "FP": 1, "FN": 0, "TN": 5})
         self.assertAlmostEqual(base["metrics"]["precision"], 2 / 3)
 

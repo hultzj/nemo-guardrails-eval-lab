@@ -124,10 +124,12 @@ def require_configs(*ids, url=None):
 
 
 def latest_run(runs, config, n):
-    """The newest complete run of `config` (n prompts) the monitor remembers, shaped like evaluate()'s
-    result; None if there is none (for example, the monitor restarted since)."""
-    # complete: all n prompts counted, and (when the run declared it) a run of exactly n prompts
-    done = [r for r in runs.values() if r["config"] == config and r["n"] == n and r.get("total") in (None, n)]
+    """The newest complete, error-free run of `config` (n prompts) the monitor remembers, shaped like
+    evaluate()'s result; None if there is none (for example, the monitor restarted since)."""
+    # complete: all n prompts counted, (when declared) a run of exactly n prompts, and every prompt got
+    # a verdict: a run with errors measured nothing and must not become a baseline
+    done = [r for r in runs.values() if r["config"] == config and r["n"] == n and r.get("total") in (None, n)
+            and r["errors"] == 0]
     if not done:
         return None
     r = max(done, key=lambda r: r["started"])
