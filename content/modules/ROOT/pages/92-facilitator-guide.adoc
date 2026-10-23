@@ -16,8 +16,8 @@ This lab runs on one shared cluster: every participant, and the presenter, gets 
 | OpenShift {ocp_version} with OpenShift GitOps
 | `oc get csv -n openshift-gitops-operator`
 
-| OpenShift AI {rhoai_version} with the TrustyAI component `Managed`
-| `oc get crd nemoguardrails.trustyai.opendatahub.io`
+| OpenShift AI {rhoai_version} with the TrustyAI and Workbenches components `Managed`, and the TrustyAI workbench image
+| `oc get crd nemoguardrails.trustyai.opendatahub.io notebooks.kubeflow.org` and `oc -n redhat-ods-applications get is odh-trustyai-notebook`
 
 | A worker with 32 free CPU cores and 24 GiB free memory for the two safety-model replicas (16 cores each; tested on an m5.metal)
 | `oc describe nodes \| grep -A5 'Allocated resources'`
@@ -32,9 +32,10 @@ This lab runs on one shared cluster: every participant, and the presenter, gets 
 | `make users` creates them in Keycloak (below)
 |===
 
-Per-participant footprint: the live monitor (about 100 MiB), the guardrails server (about
-1 GiB with Presidio), and short-lived evaluation Jobs. Shared: the safety model, 2 × 16 cores
-and 2 × 8 to 12 GiB.
+Per-participant footprint: the workbench (0.5 to 2 cores, 2 to 4 GiB, and a 5 GiB volume), the
+live monitor (about 100 MiB) and the guardrails server (about 1 GiB with Presidio). Shared: the
+safety model, 2 × 16 cores and 2 × 8 to 12 GiB. Each workbench pulls a multi-GB image on first
+start, so the first rollout takes several minutes per node.
 
 == Provision
 
@@ -70,9 +71,6 @@ the parent, the components and the Showroom guide all follow it.
 Repeat `status` until every Application shows `Synced` and `Healthy`. The safety model takes
 a few minutes on first start while it downloads and verifies the model file.
 
-If the cluster already has the Web Terminal operator, set `webTerminal.enabled: false` before
-bootstrapping, so Argo CD neither adopts nor, at teardown, deletes the owner's Subscription.
-
 == Verify every cluster
 
 [source,bash]
@@ -80,13 +78,14 @@ bootstrapping, so Argo CD neither adopts nor, at teardown, deletes the owner's S
 make -C automation verify
 ----
 
-Every line must print `PASS`. The checks impersonate each participant to confirm what they
-may and may not do, check that the decoy tenant `{decoy_namespace}` refuses anonymous callers,
-and ask the safety model to classify an unsafe prompt from a tenant namespace. Fix any `FAIL`
-before participants arrive.
+Every line must print `PASS`. The checks impersonate each participant and each workbench to
+confirm what they may and may not do, check that every workbench is running with its auth
+sidecar, that the decoy tenant `{decoy_namespace}` refuses anonymous callers, and ask the safety
+model to classify an unsafe prompt from a tenant namespace. Fix any `FAIL` before participants
+arrive.
 
-Then log in once as the first and the last participant in a browser, open the console's Web
-Terminal, and run the pre-flight from xref:02-details.adoc[Prerequisites and Environment].
+Then log in once as the first and the last participant in a browser, open their workbench from the
+OpenShift AI dashboard, and run the pre-flight from xref:02-details.adoc[Prerequisites and Environment].
 
 == Day of class
 
@@ -94,4 +93,5 @@ Terminal, and run the pre-flight from xref:02-details.adoc[Prerequisites and Env
 * Presenter: run the lab as `presenter` with the live monitor on a second screen. Module 3's content-safety run is the moment to pause: the counters climb while the log scrolls.
 * Five participants evaluating at once share four parallel slots per safety-model replica; a content-safety run then takes up to about five minutes instead of two to three.
 * If a participant's monitor shows only `ERROR` verdicts, read its pod log pane first; the cause (a typo in a ConfigMap, a missing `rails.co`) is usually there.
+* A stopped workbench is restarted from the OpenShift AI dashboard (*Workbenches* tab, *Start*); its files survive.
 * Anyone with the Showroom URL can read the guide; it contains no credentials. Tear the lab down when class ends.

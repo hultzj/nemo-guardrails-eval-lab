@@ -3,38 +3,37 @@
 
 == Remove what you created
 
-You created a `NemoGuardrails` resource, three rail ConfigMaps, and evaluation Jobs. Look at
-them first, then delete them. The live monitor, the dataset and your namespace belong to the
-lab and stay.
+You created a `NemoGuardrails` resource and three rail ConfigMaps. Look at them first, then
+delete them, from your workbench terminal. The workbench, its files (the cloned lab and your
+notebook results), the live monitor and your project belong to the lab and stay.
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-NS=$(oc whoami){tenant_suffix}
-oc -n $NS get nemoguardrails,jobs -o name
+NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+oc -n $NS get nemoguardrails -o name
 oc -n $NS get configmap regex-only content-safety tuned -o name
 ----
 
-Expected result: `nemoguardrails.trustyai.opendatahub.io/nemoguardrails`, one `job.batch/eval-...`
-per evaluation you ran, and `configmap/regex-only`, `configmap/content-safety`, `configmap/tuned`.
+Expected result: `nemoguardrails.trustyai.opendatahub.io/nemoguardrails`, and
+`configmap/regex-only`, `configmap/content-safety`, `configmap/tuned`.
+// UNVERIFIED
 
 [CAUTION]
 ====
-The next block deletes them. Your Web Terminal keeps running: it lives in a DevWorkspace in
-this namespace, which is not deleted.
+The next block deletes them. Your workbench keeps running: the lab owns it.
 ====
 
 [source,bash,role="execute"]
 ----
 oc -n $NS delete nemoguardrails nemoguardrails --ignore-not-found --wait=true
-oc -n $NS delete jobs -l app=guardrails-eval --ignore-not-found
 oc -n $NS delete configmap regex-only content-safety tuned --ignore-not-found
 oc -n $NS get deploy,route -o name
 ----
 
 Expected result: every deletion reports `deleted from <you>{tenant_suffix} namespace`, and the
-last command lists only `deployment.apps/rails-monitor`, your terminal's
-`deployment.apps/workspace...`, and `route.route.openshift.io/rails-monitor`: the operator
-removed the guardrails Deployment, Service and Route with the resource.
+last command lists only `deployment.apps/rails-monitor` and `route.route.openshift.io/rails-monitor`:
+the operator removed the guardrails Deployment, Service and Route with the resource.
+// UNVERIFIED
 
 == Remove the lab environment (whoever deployed it)
 
@@ -60,8 +59,4 @@ The last command prints `No resources found` once deletion completes. Two things
 teardown, by design or because they were created outside Argo CD:
 
 * The Keycloak users from `make users`. Remove them in the Keycloak admin console if they are no longer needed.
-* The Web Terminal operator: its Subscription is kept on purpose, so a later bootstrap can adopt
-  it (a deleted Subscription leaves the operator's CSV behind, and a new Subscription cannot adopt
-  that CSV), and the DevWorkspace operator it pulled in. To remove both for good, look first, then
-  delete the Subscriptions and the CSVs:
-  `oc get subscription,csv -n openshift-operators | grep -E 'web-terminal|devworkspace'`.
+* Each participant's workbench storage (a 5 GiB volume) goes with their project.

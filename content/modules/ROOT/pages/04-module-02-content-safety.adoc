@@ -53,7 +53,7 @@ prompt published for Nemotron Safety Guard v3.
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-NS=$(oc whoami){tenant_suffix}
+NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
 oc -n $NS apply -f - <<'EOF'
 apiVersion: v1
 kind: ConfigMap
@@ -159,7 +159,7 @@ pane switches to the new pod (`--- following pod nemoguardrails-...`).
 
 == Exercise 3: Same prompts, two configurations
 
-Define `ask` again if your terminal restarted (the block is in
+Define `ask` again if you opened a new terminal tab (the block is in
 xref:03-module-01-guarded-endpoint.adoc#_exercise_4_watch_your_first_verdicts_live[Module 1, Exercise 4]),
 then send five prompts to each configuration. Watch the monitor: the *ms* column is the
 difference between the two.

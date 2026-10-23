@@ -45,7 +45,7 @@
 
 | Content-safety rail
 | On this set, the model blocks all unsafe prompts and refuses about one legitimate prompt in ten.
-| `content-safety` TP=20 FN=0 FP=3 TN=27, with the Job and monitor tallies agreeing.
+| `content-safety` TP=20 FN=0 FP=3 TN=27, with the notebook and monitor tallies agreeing.
 
 | Policy tuning
 | Removing a category from Nemotron Safety Guard's prompt does not remove it from its verdicts.

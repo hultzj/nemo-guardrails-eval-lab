@@ -31,9 +31,13 @@
 | `rails-monitor` in your namespace, behind OpenShift login
 | Forwards your requests to the guardrails server, records each verdict, and streams decisions, run metrics and the guardrails pod log to the browser.
 
+| Workbench
+| An OpenShift AI workbench (JupyterLab, TrustyAI image) in your Data Science Project, running as its own ServiceAccount with your permissions
+| A terminal for the platform steps, and notebooks for the measurements.
+
 | Evaluation
-| An `eval` Job you start, plus the `eval-dataset` ConfigMap (50 labelled prompts)
-| Sends every prompt through the monitor, compares each verdict with its label, prints the metrics and the misclassified prompts.
+| Notebooks `03-evaluate.ipynb` and `04-tune-and-break.ipynb`, the code in `labeval.py`, and `dataset.jsonl` (50 labelled prompts)
+| Sends every prompt through the monitor, compares each verdict with its label, and shows the metrics, confusion matrices and misclassified prompts.
 |===
 
 There is no main LLM in this lab. Every request asks only for the input rails' verdict, so a

@@ -9,7 +9,7 @@ they decided?*
 
 In this module you write a pattern-based rail configuration, create a NeMo Guardrails server
 from it with authentication on, prove that strangers and other tenants are refused, and watch
-your first verdicts arrive on the live monitor.
+your first verdicts arrive on the live monitor. Run every block in your workbench's terminal.
 
 .New to NeMo Guardrails?
 [%collapsible]
@@ -57,7 +57,7 @@ flows, but the server refuses to start without a `rails.co`, so it holds a comme
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-NS=$(oc whoami){tenant_suffix}
+NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
 oc -n $NS apply -f - <<'EOF'
 apiVersion: v1
 kind: ConfigMap
@@ -127,23 +127,25 @@ the Deployment, even while the pod crash-loops (for example when a configuration
 
 == Exercise 3: Prove only you can call it
 
-Call the server's configuration list three times: with no token, with your own OpenShift
-token, and with your token against the facilitator's tenant, `{decoy_namespace}`, whose
-route differs from yours only in the namespace.
+Call the server's configuration list three times: with no token, with your workbench's token
+(`oc whoami -t` prints it), and with that token against the facilitator's tenant,
+`{decoy_namespace}`, whose route differs from yours only in the namespace.
 
 [source,bash,role="execute",subs="attributes+"]
 ----
 GR=https://$(oc -n $NS get route nemoguardrails -o jsonpath='{.spec.host}')
 DECOY=$(echo $GR | sed "s/$NS/{decoy_namespace}/")
 echo "anonymous:   $(curl -sk -o /dev/null -w '%\{http_code}' $GR/v1/rails/configs)"
-echo "you:         $(curl -sk -H "Authorization: Bearer $(oc whoami -t)" $GR/v1/rails/configs)"
+echo "your project: $(curl -sk -H "Authorization: Bearer $(oc whoami -t)" $GR/v1/rails/configs)"
 echo "other tenant: $(curl -sk -H "Authorization: Bearer $(oc whoami -t)" $DECOY/v1/rails/configs)"
 ----
 
-Expected result: `anonymous: 401`; `you: [{"id":"regex-only"}]`; `other tenant: Forbidden
-(user=<you>, verb=get, resource=services, subresource=)`. The 401 shows the proxy demands a
-token, the 403 shows a valid token is not enough: it must be allowed in *that* namespace. The
-200 is also your readiness proof: the server loaded the configuration.
+Expected result: `anonymous: 401`; `your project: [{"id":"regex-only"}]`; `other tenant: Forbidden
+(user=system:serviceaccount:<you>{tenant_suffix}:guardrails-lab, verb=get, resource=services,
+subresource=)`. The 401 shows the proxy demands a token, the 403 shows a valid token is not
+enough: it must be allowed in *that* namespace. The 200 is also your readiness proof: the server
+loaded the configuration.
+// UNVERIFIED
 
 .The scripted assertion for this exercise
 [%collapsible]
@@ -174,7 +176,7 @@ refusal, allowed prompts come back unchanged, and no other model is called.
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-NS=$(oc whoami){tenant_suffix}
+NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
 MON=https://$(oc -n $NS get route rails-monitor -o jsonpath='{.spec.host}')
 echo "Live monitor: $MON"
 ask() {  # ask <config_id> "<prompt>": one input-rail verdict, sent through the live monitor

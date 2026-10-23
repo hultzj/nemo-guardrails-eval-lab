@@ -69,7 +69,7 @@ terminal; every command in Modules 1 to 4 shows up on it within a second.
 * *Pattern rails*: regular expressions and Presidio named-entity detection; fast and predictable, blind to meaning.
 * *Content-safety rail*: asks the Nemotron Safety Guard model whether a prompt is unsafe and in which of 23 categories; sees meaning, costs a model call, and can be wrong.
 * *Live monitor*: a pass-through proxy in your namespace that records every verdict and streams it, with the guardrails pod log, to your browser.
-* *Evaluation Job*: sends the labelled prompt set through the monitor and computes the metrics.
+* *Workbench*: an OpenShift AI JupyterLab in your project: a terminal for the platform steps, notebooks for the measurements (they send the labelled prompt set through the monitor and compute the metrics).
 
 No single layer answers the customer question. The rails decide; only the evaluation says how well; only the monitor and the log say why a given request went the way it did.
 

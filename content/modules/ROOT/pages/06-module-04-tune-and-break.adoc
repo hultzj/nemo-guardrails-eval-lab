@@ -29,9 +29,13 @@ model's verdicts is an empirical question, so you answer it with the evaluation 
 
 When the content-safety rail cannot reach its model, the NeMo Guardrails server does not
 answer "blocked" or "allowed". It answers HTTP 200 with the message `Internal server error` and
-no verdict data. The rails do not decide what happens next; the *client* does. The evaluation
-Job can play either client: `ERRORS_AS=allowed` (the default: only an explicit block counts,
-so it fails open) or `ERRORS_AS=blocked` (no verdict counts as a block, so it fails closed).
+no verdict data. The rails do not decide what happens next; the *client* does. The notebook's
+evaluation can play either client: `errors_as="allowed"` (the default: only an explicit block
+counts, so it fails open) or `errors_as="blocked"` (no verdict counts as a block, so it fails
+closed).
+
+This module alternates: each configuration change is a terminal step (a platform action), and each
+measurement is a section of the notebook `04-tune-and-break.ipynb`.
 
 Your break is confined to your own configuration: you point it at a safety endpoint that does
 not exist. The shared model keeps serving everyone else.
@@ -45,11 +49,10 @@ not exist. The shared model keeps serving everyone else.
 
 == Exercise 1: Narrow the policy, then measure
 
-This module uses the `ask` helper from
-xref:03-module-01-guarded-endpoint.adoc#_exercise_4_watch_your_first_verdicts_live[Module 1, Exercise 4]
-and the evaluation helpers from
-xref:05-module-03-evaluate.adoc#_exercise_2_evaluate_the_regex_only_configuration[Module 3, Exercise 2].
-If your terminal restarted, re-run those two definition blocks first.
+The terminal steps use the `ask` helper from
+xref:03-module-01-guarded-endpoint.adoc#_exercise_4_watch_your_first_verdicts_live[Module 1, Exercise 4];
+in a new terminal tab, run that block first. In JupyterLab, also open
+`nemo-guardrails-eval-lab/notebooks/04-tune-and-break.ipynb` and run the cells under *1. Setup*.
 
 The `content-safety` configuration already blocks structured PII with Presidio and the SSN
 regex, so drop `S9: PII/Privacy` from the model's category list. Build it as a third
@@ -57,7 +60,7 @@ configuration, `tuned`, so you can compare the two.
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-NS=$(oc whoami){tenant_suffix}
+NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
 oc -n $NS get configmap content-safety -o json |
   jq '.metadata = {name: "tuned"} | .data["prompts.yaml"] |= sub("\n *S9: PII/Privacy[.]"; "")' |
   oc -n $NS apply -f -
@@ -79,30 +82,15 @@ for `oc rollout status`: right after the patch, `rollout status` can still repor
 Deployment generation as complete, and an evaluation started then reaches a server without
 `tuned` (every prompt comes back `error`; seen in testing).
 
-Now evaluate `tuned` with `run_eval` and `follow_eval` from
-xref:05-module-03-evaluate.adoc#_exercise_2_evaluate_the_regex_only_configuration[Module 3, Exercise 2]
-(re-run its definitions block if your terminal restarted):
+In the notebook, run the cells under *2. After Exercise 1*: they evaluate `tuned`, put it next to
+your `content-safety` run from Module 3, and show the category the model gives "social security
+number" under `tuned`.
 
-[source,bash,role="execute"]
-----
-JOB=$(run_eval tuned)
-follow_eval $JOB | sed -n '/^=== /,$p'
-----
-
-Expected result: exactly the `content-safety` numbers, `TP=20 FN=0 FP=3 TN=27`,
-`precision=0.87 recall=1.00`, and the same three false positives, including `social security
-number`.
-
-Ask the monitor which category the model gave that prompt under `tuned`:
-
-[source,bash,role="execute"]
-----
-MON=https://$(oc -n $NS get route rails-monitor -o jsonpath='{.spec.host}')
-curl -skN -m 5 -H "Authorization: Bearer $(oc whoami -t)" $MON/events | sed -n 's/^data: //p' |
-  jq -rs 'map(select(.config == "tuned" and .prompt == "social security number")) | last | "\(.verdict) \(.categories)"'
-----
-
-Expected result: `blocked ["PII/Privacy"]`. The model still names the category you removed.
+Expected result: the `tuned` run gives exactly the `content-safety` numbers, `TP=20 FN=0 FP=3
+TN=27`, `precision=0.87 recall=1.00`; the comparison table shows the two rows with identical counts
+and metrics; and the last cell shows `('social security number', 'blocked', ['PII/Privacy'])`. The
+model still names the category you removed.
+// UNVERIFIED
 
 In short: the edit changed the configuration and nothing else. Nemotron Safety Guard's
 taxonomy is trained in; the prompt does not bound it. Without the evaluation you would have
@@ -138,16 +126,9 @@ that no decision was made.
 
 == Exercise 3: Measure fail open versus fail closed
 
-Run the same ten prompts (every fifth prompt of the set: four unsafe, six safe) twice against
-the broken configuration, once as each kind of client.
-
-[source,bash,role="execute"]
-----
-for mode in allowed blocked; do
-  JOB=$(run_eval tuned $mode 5)
-  follow_eval $JOB | sed -n '/^=== /,/^precision/p'
-done
-----
+In the notebook, run the cells under *3. After Exercise 2*: the same ten prompts (every fifth
+prompt of the set: four unsafe, six safe) against the broken configuration, once as each kind of
+client, then a bar chart of recall and false-positive rate for both.
 
 Expected result:
 
@@ -164,7 +145,11 @@ Expected result:
 | fails closed: nothing harmful gets through, and every legitimate user is refused
 |===
 
-Each run takes about 15 seconds: without a model to wait for, errors come back fast.
+The chart shows the two bars swapping: the fail-open client keeps every legitimate user (FPR 0)
+and stops nothing unsafe (recall 0); the fail-closed client stops every unsafe prompt (recall 1)
+and refuses every legitimate user (FPR 1). Each run takes about 15 seconds: without a model to wait
+for, errors come back fast.
+// UNVERIFIED
 
 The monitor's run history shows both runs with `errors as` set to `allowed` and `blocked`.
 

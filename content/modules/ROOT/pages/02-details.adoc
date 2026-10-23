@@ -7,8 +7,9 @@
 | If you are… | You need
 
 | Every participant
-| A username and password from the facilitator and a browser, with the OpenShift Console open in a second browser tab (link under *Access details* below).
-Commands run in the console's Web Terminal (or your own `oc` and `jq`, logged in as yourself).
+| A username and password from the facilitator, and a browser. Everything else runs in your
+OpenShift AI workbench: a JupyterLab with a terminal for the platform steps (Modules 1 and 2, and
+the configuration changes in Module 4) and notebooks for the measurements (Modules 3 and 4).
 
 | A presenter
 | The same, plus a second browser window for the live monitor so the audience sees decisions arrive.
@@ -16,51 +17,54 @@ Commands run in the console's Web Terminal (or your own `oc` and `jq`, logged in
 
 Provided by the facilitator:
 
-* An OpenShift {ocp_version} cluster with OpenShift AI {rhoai_version} (TrustyAI component enabled) and this lab deployed through OpenShift GitOps.
-* Your own namespace, `<your username>{tenant_suffix}`, with the live monitor already running in it.
+* An OpenShift {ocp_version} cluster with OpenShift AI {rhoai_version} (TrustyAI and workbenches enabled) and this lab deployed through OpenShift GitOps.
+* Your own Data Science Project, `<your username>{tenant_suffix}`, with a running workbench, `guardrails-lab`, and the live monitor.
 * The shared safety model in `{lab_namespace}`.
 
-You act as *your own OpenShift user* throughout. In your namespace you can read everything
-except Secrets, and you can create ConfigMaps, `NemoGuardrails` resources and Jobs, and open a terminal (exec) into pods. Nothing else.
+Commands in the workbench run as the *workbench's identity* (its ServiceAccount), which holds
+exactly the permissions you hold in your project: read everything except Secrets; create and
+change ConfigMaps and `NemoGuardrails` resources. Nothing else, and nothing outside your project.
 
-== Open a terminal
+== Open your workbench
 
-. Open the OpenShift Console (link under *Access details* below) in a new browser tab and log in with *keycloak* and your username and password.
-. Click the terminal icon (*>_*) in the console masthead.
-. In *Initialize terminal*, open the *Project* list, choose `<your username>{tenant_suffix}` (not *Create Project*: you cannot create projects), and click *Start*.
+. Open the OpenShift AI dashboard, `https://rh-ai.{cluster_domain}`, and log in with *keycloak* and your username and password.
+. In the left menu click *Projects*, then your project, `<your username>{tenant_suffix}`.
+. Open the *Workbenches* tab and click the workbench name, *guardrails-lab*. JupyterLab opens in a new browser tab.
+. If OpenShift asks you to authorize access, click *Allow selected permissions*.
 
-Expected result: the *Initialize terminal* form lists *Create Project* and your own project
-only; after *Start*, the terminal shows `Welcome to the OpenShift Web Terminal` and a
-`bash-5.1 ~ $` prompt. The first start takes a minute or two.
+Expected result: JupyterLab opens with an empty file browser on the left. The workbench status on the
+dashboard reads *Running*.
+// UNVERIFIED
 
-[NOTE]
-====
-The Web Terminal stops after 15 minutes without keyboard input (change it with *Timeout* in
-*Initialize terminal*). Reopening it starts a fresh shell: re-run the first line of the next
-block to set `$NS`, and the helper blocks a module points you to.
-====
+== Get the lab files and run the pre-flight check
 
-== Run the pre-flight check
-
-Run this in the Web Terminal. The first line names your namespace; re-run it whenever the
-terminal restarts.
+In JupyterLab choose *File > New > Terminal*. Run the block below in that terminal: it copies the
+lab's notebooks onto your workbench's storage (they survive a workbench restart) and checks what
+the workbench may do.
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-NS=$(oc whoami){tenant_suffix}
+cd ~ && { [ -d nemo-guardrails-eval-lab ] || git clone -q {lab_repo_url}; }
+NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
 oc whoami
 oc get namespace $NS
-for r in nemoguardrails.trustyai.opendatahub.io configmaps jobs.batch; do
+for r in nemoguardrails.trustyai.opendatahub.io configmaps; do
   echo "create $r: $(oc auth can-i create $r -n $NS)"
 done
 echo "get pods/log: $(oc auth can-i get pods --subresource=log -n $NS)"
 echo "get secrets: $(oc auth can-i get secrets -n $NS)"
-jq --version
+echo "create in {decoy_namespace}: $(oc auth can-i create configmaps -n {decoy_namespace})"
+ls ~/nemo-guardrails-eval-lab/notebooks
 ----
 
-Expected result: `oc whoami` prints your username, the namespace is `Active`, the three
-`create` lines and `get pods/log` print `yes`, `get secrets` prints `no`, and `jq` prints `jq-1.6`.
-The `no` is the point: the lab grants exactly what the exercises need.
+Expected result: `oc whoami` prints `system:serviceaccount:<your username>{tenant_suffix}:guardrails-lab`,
+the namespace is `Active`, the two `create` lines and `get pods/log` print `yes`, `get secrets` and
+the create in another tenant's project print `no`, and the notebooks folder lists
+`03-evaluate.ipynb`, `04-tune-and-break.ipynb`, `dataset.jsonl` and `labeval.py`. The `no` lines are
+the point: the lab grants exactly what the exercises need.
+// UNVERIFIED
+
+The first two lines set up a new terminal; re-run them whenever you open another terminal tab.
 
 == Access details
 
@@ -68,8 +72,14 @@ The `no` is the point: the lab grants exactly what the exercises need.
 |===
 | Setting | Value
 
-| Your namespace
+| Your project
 | `<your username>{tenant_suffix}` (in the terminal: `$NS`)
+
+| OpenShift AI dashboard
+| link:https://rh-ai.{cluster_domain}[rh-ai.{cluster_domain}^]
+
+| Your workbench
+| pass:c,a,q[`https://rh-ai.{cluster_domain}/notebook/<your username>{tenant_suffix}/guardrails-lab`]
 
 | Live monitor
 | pass:c,a,q[`https://rails-monitor-<your username>{tenant_suffix}.{cluster_domain}`]
@@ -77,8 +87,8 @@ The `no` is the point: the lab grants exactly what the exercises need.
 | Shared safety model
 | pass:c,a,q[`{safety_url}`] (reachable only from inside the cluster)
 
-| OpenShift Console
-| link:https://console-openshift-console.{cluster_domain}[console-openshift-console.{cluster_domain}^]
+| Lab files
+| link:{lab_repo_url}[{lab_repo_url}^]
 |===
 
 Proceed to xref:03-module-01-guarded-endpoint.adoc[Module 1: Stand up a guarded endpoint].

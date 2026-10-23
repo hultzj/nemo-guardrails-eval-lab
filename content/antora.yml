@@ -22,4 +22,5 @@ asciidoc:
     safety_model: 'Llama-3.1-Nemotron-Safety-Guard-8B-v3 (Q4_K_M)'
     python_image: 'registry.access.redhat.com/ubi9/python-312:9.8-1792441557@sha256:f43a57e9a6a2243e333008219002b9f2b1661868a94199f5dec4d602e1501482'
     rhoai_version: '3.5.2'
+    lab_repo_url: 'https://github.com/hultzj/nemo-guardrails-eval-lab.git'
     ocp_version: '5.0'
