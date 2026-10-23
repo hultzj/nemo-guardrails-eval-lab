@@ -102,7 +102,8 @@ def monitor_runs(url=None):
 def latest_run(runs, config, n):
     """The newest complete run of `config` (n prompts) the monitor remembers, shaped like evaluate()'s
     result; None if there is none (for example, the monitor restarted since)."""
-    done = [r for r in runs.values() if r["config"] == config and r["n"] == n]
+    # complete: all n prompts counted, and (when the run declared it) a run of exactly n prompts
+    done = [r for r in runs.values() if r["config"] == config and r["n"] == n and r.get("total") in (None, n)]
     if not done:
         return None
     r = max(done, key=lambda r: r["started"])

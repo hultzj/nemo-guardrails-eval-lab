@@ -59,3 +59,13 @@ teardown, by design or because they were created outside Argo CD:
 
 * The Keycloak users from `make users`. Remove them in the Keycloak admin console if they are no longer needed.
 * Each participant's workbench storage (a 5 GiB volume) goes with their project.
+* *Earlier versions of this lab* used the console's Web Terminal, and kept its operator on teardown.
+  A cluster deployed with one keeps the Web Terminal and DevWorkspace operators. If nothing else
+  uses them, look first (`oc get devworkspaces -A`, `oc get subscription,csv -n openshift-operators
+  | grep -E 'web-terminal|devworkspace'`), then delete any DevWorkspaces, both Subscriptions and both
+  CSVs, and finally the leftovers the DevWorkspace operator documents: the `controller.devfile.io`
+  validating and mutating webhook configurations first, then the `devworkspace-webhook-server`
+  Deployment and `devworkspace-webhookserver` Service in `openshift-operators`, the
+  `web-terminal-exec` and `web-terminal-tooling` DevWorkspaceTemplates, the four `devfile.io` CRDs,
+  and the `devworkspace-*` ClusterRoles and bindings. Removing the webhook server before its webhook
+  configurations would make pod operations fail cluster-wide.

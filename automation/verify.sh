@@ -91,6 +91,19 @@ workbench_image_matches_cluster() {
   [[ -n $commit && $commit == "$want" ]]
 }
 
+# The notebooks' own path: from inside the workbench, to the monitor's in-cluster address, TLS
+# verified against the service CA, with the workbench token (oauth-proxy delegated auth).
+workbench_reaches_monitor() {
+  local ns=$1
+  oc -n "$ns" exec guardrails-lab-0 -c guardrails-lab -- python3 -c '
+import json, ssl, sys, urllib.request
+sa = "/var/run/secrets/kubernetes.io/serviceaccount"
+ns, token = open(sa + "/namespace").read().strip(), open(sa + "/token").read().strip()
+ctx = ssl.create_default_context(cafile=sa + "/service-ca.crt")
+req = urllib.request.Request(f"https://rails-monitor.{ns}.svc:8443/healthz", headers={"Authorization": "Bearer " + token})
+sys.exit(0 if json.load(urllib.request.urlopen(req, context=ctx, timeout=15)).get("ok") else 1)'
+}
+
 # The workbench pod is up with the injected auth sidecar (the gateway route needs it).
 workbench_ready() {
   local ns=$1
@@ -129,6 +142,7 @@ for u in $USERS; do
   check "$u: rails-monitor route refuses anonymous callers" route_refuses_anonymous "$ns" rails-monitor
   check "$u: live dashboard answers an authorized caller (health + event stream)" dashboard_answers "$ns"
   check "$u: workbench running with its auth sidecar" workbench_ready "$ns"
+  check "$u: workbench reaches the monitor over verified in-cluster TLS (the notebooks' path)" workbench_reaches_monitor "$ns"
   sa="system:serviceaccount:$ns:guardrails-lab"
   check "$u: workbench identity can create nemoguardrails here, not in the decoy, and cannot read secrets" bash -c "
     [[ \$(oc auth can-i create nemoguardrails.trustyai.opendatahub.io -n $ns --as=$sa) == yes &&
