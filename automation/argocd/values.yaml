@@ -50,6 +50,9 @@ images:
 workbench:
   storage: 5Gi
   imageSelection: odh-trustyai-notebook:3.5
+  # Build commit of that tag (annotation opendatahub.io/notebook-build-commit on the image stream
+  # tag). Without it the dashboard labels the image "Deprecated" instead of "Latest" (verified).
+  imageCommit: 47efb6c
   imageDisplayName: Jupyter | TrustyAI | CPU | Python 3.12
 
 showroom:

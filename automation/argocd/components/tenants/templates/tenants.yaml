@@ -271,6 +271,7 @@ metadata:
     opendatahub.io/hardware-profile-name: default-profile
     opendatahub.io/hardware-profile-namespace: redhat-ods-applications
     notebooks.opendatahub.io/last-image-selection: {{ $.Values.workbench.imageSelection | quote }}
+    notebooks.opendatahub.io/last-image-version-git-commit-selection: {{ $.Values.workbench.imageCommit | quote }}
     opendatahub.io/image-display-name: {{ $.Values.workbench.imageDisplayName | quote }}
     openshift.io/display-name: guardrails-lab
     openshift.io/description: NeMo Guardrails evaluation lab
