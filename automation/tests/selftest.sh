@@ -26,16 +26,15 @@ for want in user1-guardrails presenter-guardrails peer-demo-guardrails; do
     fail "no tenant-isolation NetworkPolicy in $want"
 done
 
-# The tenant policy admits the DevWorkspace controller pod only (namespace AND pod selector), or the
-# Web Terminal never passes its health check.
-grep -B1 -A1 'app.kubernetes.io/name: devworkspace-controller' <<<"$tenants" | grep -q 'podSelector:' ||
-  fail "tenant policy does not admit the DevWorkspace controller by pod selector"
-[[ $(grep -c 'kubernetes.io/metadata.name: openshift-operators' <<<"$tenants") -eq $(grep -c 'app.kubernetes.io/name: devworkspace-controller' <<<"$tenants") ]] ||
-  fail "openshift-operators admitted without the controller pod selector"
-
-# Teardown must keep the Web Terminal Subscription, or the next bootstrap cannot adopt the CSV.
-helm template lab automation/argocd/components/web-terminal -f automation/argocd/values.yaml |
-  grep -q 'argocd.argoproj.io/sync-options: Delete=false' || fail "web-terminal Subscription lacks Delete=false"
+# Every tenant gets a workbench whose ServiceAccount holds the participant bindings, and the
+# tenant policy admits only the namespace itself and openshift-ingress (router + RHOAI gateway).
+[[ $(grep -c '^kind: Notebook$' <<<"$tenants") -eq 6 ]] || fail "expected one workbench Notebook per user"
+[[ $(grep -c 'name: guardrails-lab, namespace: user1-guardrails' <<<"$tenants") -eq 2 ]] ||
+  fail "workbench ServiceAccount is not bound to view and guardrails-participant"
+! grep -qE 'pods/exec|devworkspaces|openshift-console|openshift-operators' <<<"$tenants" ||
+  fail "leftover Web Terminal permissions or policy peers"
+helm template lab automation/argocd --set deployer.domain=apps.example.com | grep -q 'kind: Notebook' ||
+  fail "tenants Application does not ignore webhook-managed Notebook fields"
 
 # make users: lab.users minus lab.presenters, never a presenter even when named, and a distinct
 # password per user (a shared one would let attendees log in as each other).

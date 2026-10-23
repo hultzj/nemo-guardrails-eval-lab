@@ -1,8 +1,0 @@
-# Set by the parent chart (automation/argocd/values.yaml).
-lab: {}
-safetyModel: {}
-images: {}
-argocdNamespace: openshift-gitops
-partOf: ""
-deployer:
-  domain: ""

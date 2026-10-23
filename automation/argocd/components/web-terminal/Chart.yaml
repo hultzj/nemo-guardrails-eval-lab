@@ -1,5 +1,0 @@
-apiVersion: v2
-name: web-terminal
-description: NeMo Guardrails evaluation lab, web-terminal component
-type: application
-version: 0.1.0

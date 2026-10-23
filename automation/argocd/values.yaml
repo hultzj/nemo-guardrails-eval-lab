@@ -41,12 +41,15 @@ images:
   python: registry.access.redhat.com/ubi9/python-312:9.8-1792441557@sha256:f43a57e9a6a2243e333008219002b9f2b1661868a94199f5dec4d602e1501482
   # The cluster's own oauth-proxy (release payload): oc get is oauth-proxy -n openshift. verify.sh checks it matches.
   oauthProxy: quay.io/openshift-release-dev/ocp-v5.0-art-dev@sha256:1e1999d5e0dc35999f7cd11f94d642f790d17c3d6d5da29a2aae920631a637e2
+  # OpenShift AI 3.5 "Jupyter | TrustyAI | CPU | Python 3.12" workbench image (imagestream
+  # odh-trustyai-notebook:3.5 in redhat-ods-applications). verify.sh checks it matches.
+  workbench: registry.redhat.io/rhoai/odh-workbench-jupyter-trustyai-cpu-py312-rhel9@sha256:71b38dbb8a3d9e583540e84056bc45692873b755fc4e3ed0584214c490dbb422
 
-# Participants work as their own users with the Showroom terminal off, so they need a terminal:
-# the Web Terminal operator. false when the cluster already has it (Argo CD must not adopt, and
-# teardown must not delete, the owner's Subscription).
-webTerminal:
-  enabled: true
+# The participant workbench (one per tenant). The dashboard shows imageSelection/imageDisplayName.
+workbench:
+  storage: 5Gi
+  imageSelection: odh-trustyai-notebook:3.5
+  imageDisplayName: Jupyter | TrustyAI | CPU | Python 3.12
 
 showroom:
   enabled: true

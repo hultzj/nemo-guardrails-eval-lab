@@ -68,15 +68,29 @@ route_refuses_anonymous() {
   [[ $code == 401 || $code == 403 || $code == 302 ]]
 }
 
-# The dashboard end to end, as the eval Job reaches it: Route -> oauth-proxy (bearer token, SAR) ->
+# The dashboard end to end, as the notebooks reach it: Route -> oauth-proxy (bearer token, SAR) ->
 # monitor app. /healthz must come from the Python app, /events must open an SSE stream.
 dashboard_answers() {
   local ns=$1 host tok
   host=$(oc -n "$ns" get route rails-monitor -o jsonpath='{.spec.host}') || return 1
-  tok=$(oc -n "$ns" create token eval-runner --duration=10m) || return 1
+  tok=$(oc -n "$ns" create token guardrails-lab --duration=10m) || return 1
   curl -fsk --max-time 10 -H "Authorization: Bearer $tok" "https://$host/healthz" | grep -q '"ok": true' || return 1
   { curl -sk --max-time 3 -o /dev/null -D - -H "Authorization: Bearer $tok" "https://$host/events" || true; } |
     grep -qi '^content-type: text/event-stream'
+}
+
+workbench_image_matches_cluster() {
+  local want have
+  want=$(oc -n redhat-ods-applications get is odh-trustyai-notebook -o jsonpath='{.status.tags[?(@.tag=="3.5")].items[0].dockerImageReference}') || return 1
+  have=$(sed -n 's/^  workbench: //p' "$VALUES")
+  [[ -n $want && $want == "$have" ]]
+}
+
+# The workbench pod is up with the injected auth sidecar (the gateway route needs it).
+workbench_ready() {
+  local ns=$1
+  oc -n "$ns" wait --for=condition=Ready pod/guardrails-lab-0 --timeout=10s &&
+    [[ $(oc -n "$ns" get pod guardrails-lab-0 -o jsonpath='{.spec.containers[*].name}') == *kube-rbac-proxy* ]]
 }
 
 oauth_proxy_matches_cluster() {
@@ -98,21 +112,25 @@ cannot() { [[ $(as_user "$1" auth can-i "${@:2}" 2>/dev/null) == no ]]; }
 check "lab Applications are Synced/Healthy" apps_synced_healthy
 check "Showroom route answers" showroom_answers
 check "images.oauthProxy matches this cluster's oauth-proxy image" oauth_proxy_matches_cluster
+check "images.workbench matches this cluster's TrustyAI 3.5 workbench image" workbench_image_matches_cluster
 check "safety model rolled out" oc -n "$LAB_NS" rollout status deploy/safety-guard --timeout=10s
 check "TrustyAI NemoGuardrails CRD present" oc get crd nemoguardrails.trustyai.opendatahub.io
 check "decoy guardrails ($DECOY_NS) rolled out" oc -n "$DECOY_NS" rollout status deploy/nemoguardrails --timeout=10s
 check "decoy guardrails route refuses anonymous callers" route_refuses_anonymous "$DECOY_NS" nemoguardrails
-if sed -n '/^webTerminal:/,/^[^ ]/p' "$VALUES" | grep -q 'enabled: true'; then
-  check "Web Terminal operator installed" bash -c "oc get csv -n openshift-operators -o name | grep -q web-terminal"
-fi
 first=true
 for u in $USERS; do
   ns="$u$SUFFIX"
   check "$u: rails-monitor rolled out" oc -n "$ns" rollout status deploy/rails-monitor --timeout=10s
   check "$u: rails-monitor route refuses anonymous callers" route_refuses_anonymous "$ns" rails-monitor
   check "$u: live dashboard answers an authorized caller (health + event stream)" dashboard_answers "$ns"
+  check "$u: workbench running with its auth sidecar" workbench_ready "$ns"
+  sa="system:serviceaccount:$ns:guardrails-lab"
+  check "$u: workbench identity can create nemoguardrails here, not in the decoy, and cannot read secrets" bash -c "
+    [[ \$(oc auth can-i create nemoguardrails.trustyai.opendatahub.io -n $ns --as=$sa) == yes &&
+       \$(oc auth can-i create nemoguardrails.trustyai.opendatahub.io -n $DECOY_NS --as=$sa) == no &&
+       \$(oc auth can-i get secrets -n $ns --as=$sa) == no ]]"
   check "$u: can create nemoguardrails" can "$u" create nemoguardrails.trustyai.opendatahub.io -n "$ns"
-  check "$u: can create configmaps and jobs" bash -c "$(declare -f as_user can); can $u create configmaps -n $ns && can $u create jobs.batch -n $ns"
+  check "$u: can create configmaps and start/stop the workbench" bash -c "$(declare -f as_user can); can $u create configmaps -n $ns && can $u patch notebooks.kubeflow.org -n $ns"
   # Presenters are named in lab.presenters, never inferred from their privileges: a participant who
   # was accidentally given cluster-admin must fail here, not be skipped.
   if [[ " $PRESENTERS " == *" $u "* ]]; then

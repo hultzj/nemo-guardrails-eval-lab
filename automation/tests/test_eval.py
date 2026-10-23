@@ -1,7 +1,9 @@
-"""Self-checks for eval.py: tallies for every kind of answer, in both ERRORS_AS modes.
+"""Self-checks for notebooks/labeval.py: tallies for every kind of answer, in both ERRORS_AS modes,
+as a script and as the library the notebooks import.
 
 Runs the real script against a stub monitor:  python3 -m unittest discover -s automation/tests
 """
+import importlib.util
 import json
 import os
 import re
@@ -13,7 +15,7 @@ import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-EVAL = os.path.join(HERE, "..", "argocd", "components", "tenants", "files", "eval.py")
+EVAL = os.path.join(HERE, "..", "..", "notebooks", "labeval.py")
 
 ALLOWED = {"guardrails": {"output_data": {"triggered_input_rail": None, "allowed": True}}}
 BLOCKED = {"guardrails": {"output_data": {"triggered_input_rail": "regex check input"}}}
@@ -90,6 +92,20 @@ class EvalTest(unittest.TestCase):
         procs = [subprocess.Popen([sys.executable, EVAL], env=env, stdout=subprocess.PIPE, text=True) for _ in range(2)]
         runs = {re.search(r"^run=(\S+)", p.communicate(timeout=60)[0], re.M).group(1) for p in procs}
         self.assertEqual(len(runs), 2, runs)
+
+
+    def test_library_call_used_by_the_notebooks(self):
+        os.environ["SA_DIR"] = self.dir
+        spec = importlib.util.spec_from_file_location("labeval", EVAL)
+        lab = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(lab)
+        res = lab.evaluate("t", lab.load_rows(self.dataset), "allowed",
+                           url=f"http://127.0.0.1:{self.srv.server_port}", progress=None)
+        self.assertEqual(res["counts"], {"TP": 1, "FN": 3, "FP": 1, "TN": 3})
+        self.assertEqual(res["errors"], 4)
+        self.assertAlmostEqual(res["metrics"]["recall"], 0.25)
+        self.assertEqual({r["outcome"] for r in res["results"] if r["id"] == "u-drop"}, {"FN"})
+        self.assertEqual(len(lab.load_rows(self.dataset, stride=4)), 2)
 
 
 if __name__ == "__main__":

@@ -10,12 +10,15 @@ metadata:
     demo.redhat.com/application: field-content
     argocd.argoproj.io/managed-by: {{ $.Values.argocdNamespace }}
     app.kubernetes.io/part-of: {{ $.Values.partOf }}
+    # A Data Science Project: the OpenShift AI dashboard lists it and its workbench.
+    opendatahub.io/dashboard: "true"
+  annotations:
+    openshift.io/display-name: {{ printf "%s: guardrails lab" $user | quote }}
 ---
 # The NeMo server listens unauthenticated on :8000 behind its kube-rbac-proxy: without this policy
 # another tenant's pod could call it by pod IP and skip the proxy (verified: 200 before, refused after).
-# Admit only this namespace, the OpenShift router (Routes), the console (Web Terminal) and the
-# DevWorkspace controller, which health-checks the terminal (without it: stuck at "Waiting for
-# workspace health check", verified). Namespace and pod selector in one peer: both must match.
+# Admit only this namespace and openshift-ingress, where the OpenShift router (Routes) and the
+# OpenShift AI data-science-gateway (the workbench URL) run.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -29,14 +32,9 @@ spec:
         - podSelector: {}
         - namespaceSelector:
             matchLabels: {network.openshift.io/policy-group: ingress}
-        - namespaceSelector:
-            matchLabels: {kubernetes.io/metadata.name: openshift-console}
-        - namespaceSelector:
-            matchLabels: {kubernetes.io/metadata.name: openshift-operators}
-          podSelector:
-            matchLabels: {app.kubernetes.io/name: devworkspace-controller}
 ---
-# Participants read everything except Secrets (ClusterRole view) ...
+# Participants, and their workbench (the terminal and notebooks run as its ServiceAccount), read
+# everything except Secrets (ClusterRole view) ...
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -45,6 +43,7 @@ metadata:
 roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: view}
 subjects:
   - {apiGroup: rbac.authorization.k8s.io, kind: User, name: {{ $user | quote }}}
+  - {kind: ServiceAccount, name: guardrails-lab, namespace: {{ $ns }}}
 ---
 # ... and write only what the exercises change. Not ClusterRole edit: no Secrets, no Deployments.
 apiVersion: rbac.authorization.k8s.io/v1
@@ -59,20 +58,10 @@ rules:
   - apiGroups: [trustyai.opendatahub.io]
     resources: [nemoguardrails]
     verbs: [get, list, watch, create, update, patch, delete]
-  - apiGroups: [batch]
-    resources: [jobs]
-    verbs: [get, list, watch, create, delete]
-  # Web Terminal: the console creates the participant's terminal workspace in this project, and its
-  # exec sidecar sets up the terminal by exec'ing into it as the participant ("Failed to create
-  # kubeconfig in pod" without pods/exec, verified). Exec reaches only this namespace's pods, whose
-  # ServiceAccounts can do less than the participant; the DevWorkspace webhook still limits exec
-  # into a terminal pod to its creator.
-  - apiGroups: [workspace.devfile.io]
-    resources: [devworkspaces, devworkspacetemplates]
-    verbs: [get, list, watch, create, update, patch, delete]
-  - apiGroups: [""]
-    resources: [pods/exec]
-    verbs: [get, create]
+  # Start and stop the workbench from the OpenShift AI dashboard (it patches the Notebook).
+  - apiGroups: [kubeflow.org]
+    resources: [notebooks]
+    verbs: [get, list, watch, patch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -82,6 +71,7 @@ metadata:
 roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: guardrails-participant}
 subjects:
   - {apiGroup: rbac.authorization.k8s.io, kind: User, name: {{ $user | quote }}}
+  - {kind: ServiceAccount, name: guardrails-lab, namespace: {{ $ns }}}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -117,7 +107,7 @@ roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: rails-monitor}
 subjects:
   - {kind: ServiceAccount, name: rails-monitor, namespace: {{ $ns }}}
 ---
-# oauth-proxy checks bearer tokens (the eval Job, curl) with TokenReview and SubjectAccessReview.
+# oauth-proxy checks bearer tokens (the notebooks, curl) with TokenReview and SubjectAccessReview.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -127,33 +117,6 @@ metadata:
 roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: system:auth-delegator}
 subjects:
   - {kind: ServiceAccount, name: rails-monitor, namespace: {{ $ns }}}
----
-# The eval Job runs as this ServiceAccount; it may call the monitor and nothing else.
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: eval-runner
-  namespace: {{ $ns }}
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: eval-runner
-  namespace: {{ $ns }}
-rules:
-  - apiGroups: [""]
-    resources: [services]
-    resourceNames: [rails-monitor]
-    verbs: [get]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: eval-runner
-  namespace: {{ $ns }}
-roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: eval-runner}
-subjects:
-  - {kind: ServiceAccount, name: eval-runner, namespace: {{ $ns }}}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -165,17 +128,6 @@ data:
 {{ $.Files.Get "files/monitor.py" | indent 4 }}
   index.html: |
 {{ $.Files.Get "files/index.html" | indent 4 }}
-  eval.py: |
-{{ $.Files.Get "files/eval.py" | indent 4 }}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: eval-dataset
-  namespace: {{ $ns }}
-data:
-  dataset.jsonl: |
-{{ $.Files.Get "files/dataset.jsonl" | indent 4 }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -192,7 +144,7 @@ spec:
       labels: {app: rails-monitor}
       annotations:
         # Roll the pod when the app code changes.
-        checksum/app: {{ printf "%s%s%s" ($.Files.Get "files/monitor.py") ($.Files.Get "files/index.html") ($.Files.Get "files/eval.py") | sha256sum | trunc 16 }}
+        checksum/app: {{ printf "%s%s" ($.Files.Get "files/monitor.py") ($.Files.Get "files/index.html") | sha256sum | trunc 16 }}
     spec:
       serviceAccountName: rails-monitor
       volumes:
@@ -277,6 +229,87 @@ spec:
   to: {kind: Service, name: rails-monitor}
   port: {targetPort: https}
   tls: {termination: reencrypt, insecureEdgeTerminationPolicy: Redirect}
+---
+# The participant's workbench: JupyterLab (terminal + notebooks) in this Data Science Project. Its
+# ServiceAccount carries the participant's permissions (bindings above), so `oc` in its terminal and
+# the notebooks act within this namespace only.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: guardrails-lab
+  namespace: {{ $ns }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: guardrails-lab-storage
+  namespace: {{ $ns }}
+  labels: {opendatahub.io/dashboard: "true"}
+  annotations: {openshift.io/display-name: guardrails-lab-storage}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: {{ $.Values.workbench.storage }}}
+---
+# Shaped like the Notebook the OpenShift AI 3.5 dashboard creates (verified); its webhook injects the
+# kube-rbac-proxy sidecar (access: get notebooks/guardrails-lab here) and the gateway route, which is
+# why the tenants Application ignores the pod template (see applications.yaml).
+apiVersion: kubeflow.org/v1
+kind: Notebook
+metadata:
+  name: guardrails-lab
+  namespace: {{ $ns }}
+  labels:
+    app: guardrails-lab
+    opendatahub.io/dashboard: "true"
+    opendatahub.io/odh-managed: "true"
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    notebooks.opendatahub.io/inject-auth: "true"
+    notebooks.opendatahub.io/last-image-selection: {{ $.Values.workbench.imageSelection | quote }}
+    opendatahub.io/image-display-name: {{ $.Values.workbench.imageDisplayName | quote }}
+    openshift.io/display-name: guardrails-lab
+    openshift.io/description: NeMo Guardrails evaluation lab
+spec:
+  template:
+    spec:
+      serviceAccountName: guardrails-lab
+      enableServiceLinks: false
+      containers:
+        - name: guardrails-lab
+          image: {{ $.Values.images.workbench }}
+          imagePullPolicy: IfNotPresent
+          workingDir: /opt/app-root/src
+          env:
+            - name: NOTEBOOK_ARGS
+              value: |-
+                --ServerApp.port=8888
+                --ServerApp.token=''
+                --ServerApp.password=''
+                --ServerApp.base_url=/notebook/{{ $ns }}/guardrails-lab
+                --ServerApp.quit_button=False
+            - {name: JUPYTER_IMAGE, value: {{ $.Values.images.workbench | quote }}}
+          ports:
+            - {name: notebook-port, containerPort: 8888, protocol: TCP}
+          livenessProbe:
+            httpGet: {path: /notebook/{{ $ns }}/guardrails-lab/api, port: notebook-port, scheme: HTTP}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          readinessProbe:
+            httpGet: {path: /notebook/{{ $ns }}/guardrails-lab/api, port: notebook-port, scheme: HTTP}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 500m, memory: 2Gi}
+            limits: {cpu: "2", memory: 4Gi}
+          volumeMounts:
+            - {name: guardrails-lab-storage, mountPath: /opt/app-root/src/}
+            - {name: shm, mountPath: /dev/shm}
+      volumes:
+        - name: guardrails-lab-storage
+          persistentVolumeClaim: {claimName: guardrails-lab-storage}
+        - name: shm
+          emptyDir: {medium: Memory}
 {{- end }}
 {{- with .Values.lab.decoyTenant }}
 {{- $ns := printf "%s%s" . $.Values.lab.tenantSuffix }}
@@ -292,9 +325,8 @@ metadata:
 ---
 # The NeMo server listens unauthenticated on :8000 behind its kube-rbac-proxy: without this policy
 # another tenant's pod could call it by pod IP and skip the proxy (verified: 200 before, refused after).
-# Admit only this namespace, the OpenShift router (Routes), the console (Web Terminal) and the
-# DevWorkspace controller, which health-checks the terminal (without it: stuck at "Waiting for
-# workspace health check", verified). Namespace and pod selector in one peer: both must match.
+# Admit only this namespace and openshift-ingress, where the OpenShift router (Routes) and the
+# OpenShift AI data-science-gateway (the workbench URL) run.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -308,12 +340,6 @@ spec:
         - podSelector: {}
         - namespaceSelector:
             matchLabels: {network.openshift.io/policy-group: ingress}
-        - namespaceSelector:
-            matchLabels: {kubernetes.io/metadata.name: openshift-console}
-        - namespaceSelector:
-            matchLabels: {kubernetes.io/metadata.name: openshift-operators}
-          podSelector:
-            matchLabels: {app.kubernetes.io/name: devworkspace-controller}
 ---
 apiVersion: v1
 kind: ConfigMap

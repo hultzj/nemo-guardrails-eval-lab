@@ -49,9 +49,6 @@ spec:
 {{- end }}
 {{- if .Values.prereqs.enabled }}
 {{- $components := list (dict "name" "safety-model" "wave" "0") (dict "name" "tenants" "wave" "1") }}
-{{- if .Values.webTerminal.enabled }}
-{{- $components = append $components (dict "name" "web-terminal" "wave" "0") }}
-{{- end }}
 {{- range $components }}
 ---
 apiVersion: argoproj.io/v1alpha1
@@ -77,10 +74,20 @@ spec:
         lab: {{- toYaml $.Values.lab | nindent 10 }}
         safetyModel: {{- toYaml $.Values.safetyModel | nindent 10 }}
         images: {{- toYaml $.Values.images | nindent 10 }}
+        workbench: {{- toYaml $.Values.workbench | nindent 10 }}
         argocdNamespace: {{ $.Values.argocd.namespace | quote }}
         partOf: {{ $.Release.Name | quote }}
         deployer:
           domain: {{ $.Values.deployer.domain | quote }}
+  {{- if eq .name "tenants" }}
+  # The OpenShift AI webhook and notebook controller add a sidecar, volumes, annotations, labels and
+  # finalizers to each workbench Notebook, and the dashboard patches it to stop/start it: let them.
+  # To change the workbench image, delete the Notebook and Argo CD recreates it.
+  ignoreDifferences:
+    - group: kubeflow.org
+      kind: Notebook
+      jsonPointers: [/spec/template/spec, /metadata/annotations, /metadata/labels, /metadata/finalizers]
+  {{- end }}
   destination:
     server: https://kubernetes.default.svc
     namespace: {{ $.Values.lab.namespace }}
