@@ -41,8 +41,9 @@ file browser on the left.
 In JupyterLab choose *File > New > Terminal*. Run the block below in that terminal: it fetches the
 lab files onto your workbench's storage (they survive a workbench restart), from the repository
 and revision the lab was deployed from (the `lab-source` ConfigMap in your project), and checks
-what the workbench may do. Re-running it updates the files to that revision; git refuses, and
-changes nothing, if you have edited a lab file.
+what the workbench may do. Re-running it updates the files to that revision. Running a notebook
+saves its outputs into the file, so git then refuses (`Your local changes ... would be overwritten`)
+and changes nothing; keep your copy with `git -C ~/nemo-guardrails-eval-lab stash` and re-run.
 
 [source,bash,role="execute",subs="attributes+"]
 ----
