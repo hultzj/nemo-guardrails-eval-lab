@@ -74,6 +74,7 @@ Edit the safety policy and measure the effect, then cut the safety model off and
 
 * *50 prompts is a smoke test, not a benchmark.* One prompt moves recall by five points. Use the numbers to compare configurations on the same set, not to rank models.
 * *The model has seen data like this before.* Forty prompts come from the Aegis 2.0 test split; Nemotron Safety Guard was trained on Aegis 2.0. Expect it to look better here than on your own traffic. The ten hand-written "trap" prompts are the out-of-distribution signal.
+* *Verdicts repeat; categories may not.* Across repeated test runs every verdict was identical, but the categories the model listed for borderline prompts changed. Use the categories to explain a block, not as a metric.
 * *Input rails only.* The lab measures prompt screening. Output rails (checking the model's answer) are not exercised.
 * *CPU latency is not GPU latency.* The safety model runs quantized on CPU. Latency numbers show relative cost between rails, not production performance.
 
