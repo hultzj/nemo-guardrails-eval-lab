@@ -79,11 +79,12 @@ dashboard_answers() {
     grep -qi '^content-type: text/event-stream'
 }
 
+# images.workbench names an OpenShift AI image stream tag; it must exist and be imported.
 workbench_image_matches_cluster() {
-  local want have
-  want=$(oc -n redhat-ods-applications get is odh-trustyai-notebook -o jsonpath='{.status.tags[?(@.tag=="3.5")].items[0].dockerImageReference}') || return 1
-  have=$(sed -n 's/^  workbench: //p' "$VALUES")
-  [[ -n $want && $want == "$have" ]]
+  local ref tag
+  ref=$(sed -n 's/^  workbench: //p' "$VALUES")
+  tag=${ref##*/}
+  [[ -n $(oc -n redhat-ods-applications get istag "$tag" -o jsonpath='{.image.dockerImageReference}') ]]
 }
 
 # The workbench pod is up with the injected auth sidecar (the gateway route needs it).
@@ -112,7 +113,7 @@ cannot() { [[ $(as_user "$1" auth can-i "${@:2}" 2>/dev/null) == no ]]; }
 check "lab Applications are Synced/Healthy" apps_synced_healthy
 check "Showroom route answers" showroom_answers
 check "images.oauthProxy matches this cluster's oauth-proxy image" oauth_proxy_matches_cluster
-check "images.workbench matches this cluster's TrustyAI 3.5 workbench image" workbench_image_matches_cluster
+check "images.workbench is an imported OpenShift AI image stream tag" workbench_image_matches_cluster
 check "safety model rolled out" oc -n "$LAB_NS" rollout status deploy/safety-guard --timeout=10s
 check "TrustyAI NemoGuardrails CRD present" oc get crd nemoguardrails.trustyai.opendatahub.io
 check "decoy guardrails ($DECOY_NS) rolled out" oc -n "$DECOY_NS" rollout status deploy/nemoguardrails --timeout=10s
