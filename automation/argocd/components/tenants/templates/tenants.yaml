@@ -266,6 +266,10 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
     notebooks.opendatahub.io/inject-auth: "true"
+    # Without a hardware profile the dashboard flags the workbench "Deprecated" (verified);
+    # resources below stay inside default-profile's range (1-4 CPU, 2-8 GiB).
+    opendatahub.io/hardware-profile-name: default-profile
+    opendatahub.io/hardware-profile-namespace: redhat-ods-applications
     notebooks.opendatahub.io/last-image-selection: {{ $.Values.workbench.imageSelection | quote }}
     opendatahub.io/image-display-name: {{ $.Values.workbench.imageDisplayName | quote }}
     openshift.io/display-name: guardrails-lab
@@ -300,7 +304,7 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 5
           resources:
-            requests: {cpu: 500m, memory: 2Gi}
+            requests: {cpu: "1", memory: 2Gi}
             limits: {cpu: "2", memory: 4Gi}
           volumeMounts:
             - {name: guardrails-lab-storage, mountPath: /opt/app-root/src/}

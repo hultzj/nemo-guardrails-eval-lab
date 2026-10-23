@@ -32,7 +32,7 @@ This lab runs on one shared cluster: every participant, and the presenter, gets 
 | `make users` creates them in Keycloak (below)
 |===
 
-Per-participant footprint: the workbench (0.5 to 2 cores, 2 to 4 GiB, and a 5 GiB volume), the
+Per-participant footprint: the workbench (1 to 2 cores, 2 to 4 GiB, and a 5 GiB volume), the
 live monitor (about 100 MiB) and the guardrails server (about 1 GiB with Presidio). Shared: the
 safety model, 2 × 16 cores and 2 × 8 to 12 GiB. Each workbench pulls a multi-GB image on first
 start, so the first rollout takes several minutes per node.
