@@ -7,7 +7,7 @@
 | If you are… | You need
 
 | Every participant
-| A username and password from the facilitator and a browser. The *OpenShift Console* tab opens the console in a new browser tab.
+| A username and password from the facilitator and a browser, with the OpenShift Console open in a second browser tab (link under *Access details* below).
 Commands run in the console's Web Terminal (or your own `oc` and `jq`, logged in as yourself).
 
 | A presenter
@@ -25,7 +25,7 @@ except Secrets, and you can create ConfigMaps, `NemoGuardrails` resources and Jo
 
 == Open a terminal
 
-. Click the *OpenShift Console* tab (it opens a new browser tab) and log in with *keycloak* and your username and password.
+. Open the OpenShift Console (link under *Access details* below) in a new browser tab and log in with *keycloak* and your username and password.
 . Click the terminal icon (*>_*) in the console masthead.
 . In *Initialize terminal*, open the *Project* list, choose `<your username>{tenant_suffix}` (not *Create Project*: you cannot create projects), and click *Start*.
 

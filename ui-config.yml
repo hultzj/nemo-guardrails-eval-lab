@@ -4,14 +4,8 @@ type: showroom
 default_width: 30
 persist_url_state: true
 
-view_switcher:
-  enabled: true
-  default_mode: split
-
-# No Terminal tab: the Showroom URL has no login, and participants work as their own
-# OpenShift users (shared cluster), in the console's Web Terminal.
-tabs:
-  # The console refuses to be framed; Showroom opens an external tab in a new browser tab.
-  - name: OpenShift Console
-    url: 'https://console-openshift-console.${DOMAIN}'
-    external: true
+# No tabs: the Showroom terminal is off (participants work as their own OpenShift users, in the
+# console's Web Terminal), and the console refuses to be framed (X-Frame-Options: deny), so a
+# console tab renders an empty pane. With no tabs Showroom shows the guide full width; the console
+# link is on the Prerequisites and Environment page.
+tabs: []
