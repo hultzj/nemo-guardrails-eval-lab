@@ -13,7 +13,9 @@ metadata:
 ---
 # The NeMo server listens unauthenticated on :8000 behind its kube-rbac-proxy: without this policy
 # another tenant's pod could call it by pod IP and skip the proxy (verified: 200 before, refused after).
-# Admit only this namespace, the OpenShift router (Routes) and the console (Web Terminal).
+# Admit only this namespace, the OpenShift router (Routes), the console (Web Terminal) and the
+# DevWorkspace controller, which health-checks the terminal (without it: stuck at "Waiting for
+# workspace health check", verified). Namespace and pod selector in one peer: both must match.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -29,6 +31,10 @@ spec:
             matchLabels: {network.openshift.io/policy-group: ingress}
         - namespaceSelector:
             matchLabels: {kubernetes.io/metadata.name: openshift-console}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: openshift-operators}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: devworkspace-controller}
 ---
 # Participants read everything except Secrets (ClusterRole view) ...
 apiVersion: rbac.authorization.k8s.io/v1
@@ -286,7 +292,9 @@ metadata:
 ---
 # The NeMo server listens unauthenticated on :8000 behind its kube-rbac-proxy: without this policy
 # another tenant's pod could call it by pod IP and skip the proxy (verified: 200 before, refused after).
-# Admit only this namespace, the OpenShift router (Routes) and the console (Web Terminal).
+# Admit only this namespace, the OpenShift router (Routes), the console (Web Terminal) and the
+# DevWorkspace controller, which health-checks the terminal (without it: stuck at "Waiting for
+# workspace health check", verified). Namespace and pod selector in one peer: both must match.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -302,6 +310,10 @@ spec:
             matchLabels: {network.openshift.io/policy-group: ingress}
         - namespaceSelector:
             matchLabels: {kubernetes.io/metadata.name: openshift-console}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: openshift-operators}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: devworkspace-controller}
 ---
 apiVersion: v1
 kind: ConfigMap

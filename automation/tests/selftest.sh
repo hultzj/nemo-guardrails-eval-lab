@@ -26,6 +26,13 @@ for want in user1-guardrails presenter-guardrails peer-demo-guardrails; do
     fail "no tenant-isolation NetworkPolicy in $want"
 done
 
+# The tenant policy admits the DevWorkspace controller pod only (namespace AND pod selector), or the
+# Web Terminal never passes its health check.
+grep -B1 -A1 'app.kubernetes.io/name: devworkspace-controller' <<<"$tenants" | grep -q 'podSelector:' ||
+  fail "tenant policy does not admit the DevWorkspace controller by pod selector"
+[[ $(grep -c 'kubernetes.io/metadata.name: openshift-operators' <<<"$tenants") -eq $(grep -c 'app.kubernetes.io/name: devworkspace-controller' <<<"$tenants") ]] ||
+  fail "openshift-operators admitted without the controller pod selector"
+
 # make users: lab.users minus lab.presenters, never a presenter even when named, and a distinct
 # password per user (a shared one would let attendees log in as each other).
 created=$(DRY_RUN=1 bash automation/create-users.sh | grep '^would create')
