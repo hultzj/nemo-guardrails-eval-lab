@@ -33,8 +33,23 @@ done
   fail "workbench ServiceAccount is not bound to view and guardrails-participant"
 ! grep -qE 'pods/exec|devworkspaces|openshift-console|openshift-operators' <<<"$tenants" ||
   fail "leftover Web Terminal permissions or policy peers"
-helm template lab automation/argocd --set deployer.domain=apps.example.com | grep -q 'kind: Notebook' ||
-  fail "tenants Application does not ignore webhook-managed Notebook fields"
+# Argo CD must leave the webhook-managed Notebook fields alone, and respect that when it syncs.
+parent=$(helm template lab automation/argocd --set deployer.domain=apps.example.com --set gitops.revision=event-x)
+tenants_app=$(sed -n '/name: lab-tenants$/,/^---$/p' <<<"$parent")
+grep -q 'kind: Notebook' <<<"$tenants_app" ||
+  fail "tenants Application has no Notebook ignoreDifferences"
+grep -qF 'jsonPointers: [/spec/template/spec, /metadata/annotations, /metadata/labels, /metadata/finalizers]' <<<"$tenants_app" ||
+  fail "tenants Application ignores the wrong Notebook fields"
+grep -q 'RespectIgnoreDifferences=true' <<<"$tenants_app" ||
+  fail "tenants Application does not respect ignoreDifferences on sync"
+
+# The workbench clones the lab files from the deployed repo and revision.
+grep -q 'revision: "event-x"' <<<"$tenants_app" || fail "parent does not pass gitops.revision to tenants"
+wb=$(helm template lab automation/argocd/components/tenants -f automation/argocd/values.yaml --set partOf=lab --set gitops.revision=event-x)
+grep -q '{name: LAB_GIT_REVISION, value: "event-x"}' <<<"$wb" || fail "workbench LAB_GIT_REVISION does not follow gitops.revision"
+grep -q "{name: LAB_GIT_URL, value: \"$(sed -n 's/^  repoUrl: //p' automation/argocd/values.yaml)\"}" <<<"$wb" || fail "workbench LAB_GIT_URL is not gitops.repoUrl"
+grep -q 'git clone -q -b "$LAB_GIT_REVISION" "$LAB_GIT_URL"' content/modules/ROOT/pages/02-details.adoc ||
+  fail "the guide does not clone the deployed revision"
 
 # make users: lab.users minus lab.presenters, never a presenter even when named, and a distinct
 # password per user (a shared one would let attendees log in as each other).

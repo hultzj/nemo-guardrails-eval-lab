@@ -39,12 +39,13 @@ file browser on the left.
 == Get the lab files and run the pre-flight check
 
 In JupyterLab choose *File > New > Terminal*. Run the block below in that terminal: it copies the
-lab's notebooks onto your workbench's storage (they survive a workbench restart) and checks what
-the workbench may do.
+lab's notebooks onto your workbench's storage (they survive a workbench restart), from the same
+repository and revision the lab was deployed from (`$LAB_GIT_URL`, `$LAB_GIT_REVISION`), and checks
+what the workbench may do.
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-cd ~ && { [ -d nemo-guardrails-eval-lab ] || git clone -q {lab_repo_url}; }
+cd ~ && { [ -d nemo-guardrails-eval-lab ] || git clone -q -b "$LAB_GIT_REVISION" "$LAB_GIT_URL" nemo-guardrails-eval-lab; }
 NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
 oc whoami
 oc get namespace $NS

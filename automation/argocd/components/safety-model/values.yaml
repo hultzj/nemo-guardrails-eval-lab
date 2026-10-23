@@ -3,6 +3,7 @@ lab: {}
 safetyModel: {}
 images: {}
 workbench: {}
+gitops: {}
 argocdNamespace: openshift-gitops
 partOf: ""
 deployer:
