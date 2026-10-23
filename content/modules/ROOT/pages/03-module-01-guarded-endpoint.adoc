@@ -145,7 +145,6 @@ Expected result: `anonymous: 401`; `your project: [{"id":"regex-only"}]`; `other
 subresource=)`. The 401 shows the proxy demands a token, the 403 shows a valid token is not
 enough: it must be allowed in *that* namespace. The 200 is also your readiness proof: the server
 loaded the configuration.
-// UNVERIFIED
 
 .The scripted assertion for this exercise
 [%collapsible]

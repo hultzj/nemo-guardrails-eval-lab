@@ -16,7 +16,6 @@ oc -n $NS get configmap regex-only content-safety tuned -o name
 
 Expected result: `nemoguardrails.trustyai.opendatahub.io/nemoguardrails`, and
 `configmap/regex-only`, `configmap/content-safety`, `configmap/tuned`.
-// UNVERIFIED
 
 [CAUTION]
 ====
@@ -30,10 +29,10 @@ oc -n $NS delete configmap regex-only content-safety tuned --ignore-not-found
 oc -n $NS get deploy,route -o name
 ----
 
-Expected result: every deletion reports `deleted from <you>{tenant_suffix} namespace`, and the
-last command lists only `deployment.apps/rails-monitor` and `route.route.openshift.io/rails-monitor`:
-the operator removed the guardrails Deployment, Service and Route with the resource.
-// UNVERIFIED
+Expected result: four `deleted` lines (`nemoguardrails`, `regex-only`, `content-safety`,
+`tuned`), and the last command lists only `deployment.apps/rails-monitor` and
+`route.route.openshift.io/rails-monitor`: the operator removed the guardrails Deployment, Service
+and Route with the resource. (The workbench runs as a StatefulSet, so it is not in this list.)
 
 == Remove the lab environment (whoever deployed it)
 

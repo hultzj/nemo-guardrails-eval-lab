@@ -90,7 +90,6 @@ Expected result: the `tuned` run gives exactly the `content-safety` numbers, `TP
 TN=27`, `precision=0.87 recall=1.00`; the comparison table shows the two rows with identical counts
 and metrics; and the last cell shows `('social security number', 'blocked', ['PII/Privacy'])`. The
 model still names the category you removed.
-// UNVERIFIED
 
 In short: the edit changed the configuration and nothing else. Nemotron Safety Guard's
 taxonomy is trained in; the prompt does not bound it. Without the evaluation you would have
@@ -128,7 +127,8 @@ that no decision was made.
 
 In the notebook, run the cells under *3. After Exercise 2*: the same ten prompts (every fifth
 prompt of the set: four unsafe, six safe) against the broken configuration, once as each kind of
-client, then a bar chart of recall and false-positive rate for both.
+client, then a bar chart of what each client pays: unsafe prompts let through (FNR) and
+legitimate prompts refused (FPR).
 
 Expected result:
 
@@ -145,11 +145,10 @@ Expected result:
 | fails closed: nothing harmful gets through, and every legitimate user is refused
 |===
 
-The chart shows the two bars swapping: the fail-open client keeps every legitimate user (FPR 0)
-and stops nothing unsafe (recall 0); the fail-closed client stops every unsafe prompt (recall 1)
-and refuses every legitimate user (FPR 1). Each run takes about 15 seconds: without a model to wait
-for, errors come back fast.
-// UNVERIFIED
+The table shows the two runs with `errors` 10 each. The chart has one full bar per client: the
+fail-open client lets every unsafe prompt through (FNR 1.0) and refuses no one; the fail-closed
+client refuses every legitimate user (FPR 1.0) and lets nothing unsafe through. Each run takes
+about 10 seconds: without a model to wait for, errors come back fast.
 
 The monitor's run history shows both runs with `errors as` set to `allowed` and `blocked`.
 

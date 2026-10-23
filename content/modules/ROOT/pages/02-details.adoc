@@ -28,13 +28,13 @@ change ConfigMaps and `NemoGuardrails` resources. Nothing else, and nothing outs
 == Open your workbench
 
 . Open the OpenShift AI dashboard, `https://rh-ai.{cluster_domain}`, and log in with *keycloak* and your username and password.
-. In the left menu click *Projects*, then your project, `<your username>{tenant_suffix}`.
-. Open the *Workbenches* tab and click the workbench name, *guardrails-lab*. JupyterLab opens in a new browser tab.
+. In the left menu click *Projects*, then your project, *<your username>: guardrails lab*.
+. Open the *Workbenches* tab. The row *guardrails-lab* shows the image *Jupyter | TrustyAI | CPU | Python 3.12*, *3.5*, *Latest*, and the status *Ready*. Click the workbench name, *guardrails-lab*: JupyterLab opens in a new browser tab.
 . If OpenShift asks you to authorize access, click *Allow selected permissions*.
 
-Expected result: JupyterLab opens with an empty file browser on the left. The workbench status on the
-dashboard reads *Running*.
-// UNVERIFIED
+Expected result: a new browser tab titled *JupyterLab* at
+pass:c,a,q[`https://rh-ai.{cluster_domain}/notebook/<your username>{tenant_suffix}/guardrails-lab/lab`], with the
+file browser on the left.
 
 == Get the lab files and run the pre-flight check
 
@@ -62,7 +62,6 @@ the namespace is `Active`, the two `create` lines and `get pods/log` print `yes`
 the create in another tenant's project print `no`, and the notebooks folder lists
 `03-evaluate.ipynb`, `04-tune-and-break.ipynb`, `dataset.jsonl` and `labeval.py`. The `no` lines are
 the point: the lab grants exactly what the exercises need.
-// UNVERIFIED
 
 The first two lines set up a new terminal; re-run them whenever you open another terminal tab.
 

@@ -24,10 +24,12 @@ Working document. Not rendered by Antora.
 - **Tenancy:** shared cluster, up to 5 attendees plus the presenter, one
   namespace per user: `<user>-guardrails`, created by an ApplicationSet (list
   generator) from the facilitator's user list.
-- **Participant identity:** each attendee's own OpenShift user (Keycloak
-  `user1..user5`, presenter `kuro`). **Showroom terminal off.** Commands run in
-  the console's Web Terminal (Web Terminal operator, GitOps toggle) or a local
-  `oc`.
+- **Participant identity:** each attendee's own OpenShift user (Keycloak `user1..user5` and a
+  non-admin `presenter`, per-user random passwords). **Showroom terminal off.** Since 2026-10-23
+  (hybrid redesign, user's choice): each tenant is a Data Science Project with an OpenShift AI
+  workbench (TrustyAI Jupyter 3.5). Commands run in its JupyterLab terminal as the workbench
+  ServiceAccount, which holds the participant's Role; Modules 3-4 measurements are notebooks over
+  `notebooks/labeval.py`. The Web Terminal operator was removed.
 - **Test cluster / repo:** the facilitator's sandbox cluster (AWS, OpenShift 5.0);
   `https://github.com/hultzj/nemo-guardrails-eval-lab` (public, to be created).
 
@@ -113,4 +115,4 @@ Jobs + `pods/log`. No Secret read (least privilege; the lab itself has no secret
 ## Open items
 
 - Keycloak users `user1..user5`: facilitator prerequisite (script in facilitator guide), since GitOps does not manage Keycloak users here.
-- Web Terminal operator: not installed on the test cluster; ship as a GitOps toggle, off when already present.
+- Verified on the workbench design (user3, 2026-10-23): GitOps-created Notebook gets the injected kube-rbac-proxy and gateway route; the dashboard shows the image as "Latest" only with the build-commit annotation and a hardware profile; Argo CD must ignore the webhook-managed Notebook fields; child Application values come from the parent render, so refresh the parent after changing values.
