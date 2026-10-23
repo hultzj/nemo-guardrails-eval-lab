@@ -42,8 +42,8 @@ class Monitor(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
-    def do_GET(self):  # /api/runs
-        data = json.dumps(RUNS).encode()
+    def do_GET(self):  # /api/runs, or /v1/rails/configs as the guardrails server
+        data = json.dumps([{"id": "regex-only"}] if self.path == "/v1/rails/configs" else RUNS).encode()
         self.send_response(200)
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
@@ -145,6 +145,24 @@ class EvalTest(unittest.TestCase):
         lab = self.lab()
         self.assertIsNone(lab.latest_run({}, "content-safety", 8))  # the notebook then re-measures
         self.assertIsNone(lab.latest_run({"rx": RUNS[3]}, "content-safety", 8))
+
+
+    def test_require_configs_stops_before_an_evaluation_that_would_measure_nothing(self):
+        lab = self.lab()
+        url = f"http://127.0.0.1:{self.srv.server_port}"
+        self.assertEqual(lab.require_configs("regex-only", url=url), ["regex-only"])
+        with self.assertRaisesRegex(RuntimeError, r"not \['content-safety'\].*Module 2"):
+            lab.require_configs("regex-only", "content-safety", url=url)
+        with self.assertRaisesRegex(RuntimeError, "No guardrails server answers.*Module 1"):
+            lab.require_configs("regex-only", url="http://127.0.0.1:9")  # nothing listens there
+
+    def test_summary_warns_when_prompts_got_no_verdict(self):
+        lab = self.lab()
+        counts = {"TP": 0, "FP": 0, "FN": 20, "TN": 30}
+        res = {"run": "r", "config": "c", "errors_as": "allowed", "counts": counts, "errors": 50,
+               "metrics": lab.metrics(counts)}
+        self.assertIn("WARNING: 50 of 50 prompts got no verdict", lab.summary(res))
+        self.assertNotIn("WARNING", lab.summary({**res, "errors": 0}))
 
 
 if __name__ == "__main__":

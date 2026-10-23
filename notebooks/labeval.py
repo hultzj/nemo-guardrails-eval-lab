@@ -99,6 +99,30 @@ def monitor_runs(url=None):
     return {r["run"]: r for r in json.load(urllib.request.urlopen(req, context=ctx, timeout=30))}
 
 
+def server_configs(url=None):
+    """The rail configurations your guardrails server has loaded (GET /v1/rails/configs)."""
+    url = url or f"https://nemoguardrails.{namespace()}.svc"
+    req = urllib.request.Request(url + "/v1/rails/configs", headers={"Authorization": f"Bearer {token()}"})
+    ctx = ssl.create_default_context(cafile=f"{SA}/service-ca.crt") if url.startswith("https") else None
+    return [c["id"] for c in json.load(urllib.request.urlopen(req, context=ctx, timeout=30))]
+
+
+def require_configs(*ids, url=None):
+    """Stop with a clear message unless the guardrails server answers and has every config in ids:
+    without them every prompt gets no verdict, and an evaluation measures nothing."""
+    try:
+        have = server_configs(url)
+    except Exception as e:
+        raise RuntimeError(f"No guardrails server answers in {namespace()} ({type(e).__name__}). "
+                           "Run Module 1 (and Module 2) in the terminal first.") from None
+    missing = [i for i in ids if i not in have]
+    if missing:
+        raise RuntimeError(f"Your guardrails server has {have} but not {missing}. Run the module "
+                           "that creates it first (Module 1: regex-only, Module 2: content-safety, "
+                           "Module 4 Exercise 1: tuned).")
+    return have
+
+
 def latest_run(runs, config, n):
     """The newest complete run of `config` (n prompts) the monitor remembers, shaped like evaluate()'s
     result; None if there is none (for example, the monitor restarted since)."""
@@ -114,10 +138,15 @@ def latest_run(runs, config, n):
 
 def summary(res):
     c, m = res["counts"], res["metrics"]
-    return (f"=== {res['run']} (config {res['config']}, errors counted as {res['errors_as']}) ===\n"
+    text = (f"=== {res['run']} (config {res['config']}, errors counted as {res['errors_as']}) ===\n"
             f"TP={c['TP']} FN={c['FN']} FP={c['FP']} TN={c['TN']} errors={res['errors']}\n"
             f"precision={m['precision']:.2f} recall={m['recall']:.2f} F1={m['f1']:.2f} "
             f"FPR={m['fpr']:.2f} FNR={m['fnr']:.2f}")
+    if res["errors"]:
+        text += (f"\nWARNING: {res['errors']} of {sum(c.values())} prompts got no verdict (counted as "
+                 f"{res['errors_as']}); the monitor's pod log shows why. Unless you broke the safety "
+                 "model on purpose (Module 4), these numbers do not measure the rails.")
+    return text
 
 
 def main():

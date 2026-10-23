@@ -46,9 +46,12 @@ itself from the verdicts it receives; the two tallies are independent and must a
 . In JupyterLab's file browser open `nemo-guardrails-eval-lab`, then `notebooks`, then `03-evaluate.ipynb`.
 . Run the cells under *1. Setup and the dataset* (select a cell and press *Shift+Enter*).
 
-Expected result: the setup cell prints your namespace and monitor URL
-(pass:c,a,q[`https://rails-monitor.<you>{tenant_suffix}.svc:8443`]) and a table with `safe 30` and
-`unsafe 20`; the helper cell prints nothing.
+Expected result: the setup cell prints your namespace, your monitor URL
+(pass:c,a,q[`https://rails-monitor.<you>{tenant_suffix}.svc:8443`]),
+`guardrails configs: ['regex-only', 'content-safety']`, and a table with `safe 30` and `unsafe 20`;
+the helper cell prints nothing. If the setup cell instead stops with `RuntimeError: No guardrails
+server answers ...` or `... but not ['content-safety']`, run Modules 1 and 2 first: without a server
+and both configurations every prompt gets no verdict, and an evaluation would measure nothing.
 
 == Exercise 2: Evaluate the regex-only configuration
 
