@@ -25,7 +25,7 @@ the same prompts to each.
 A content-safety rail is a model entry plus a flow:
 
 * Under `models`, an entry of `type: content_safety` tells NeMo where the model is: `engine: nim`
-  with a `base_url` speaks the OpenAI-compatible API, which llama.cpp serves at `{safety_url}`.
+  with a `base_url` speaks the OpenAI-compatible API, which llama.cpp serves at pass:c,a,q[`{safety_url}`].
 * In `prompts.yaml`, the task `content_safety_check_input $model=content_safety` holds the
   safety prompt and names the output parser.
 * In `rails.input.flows`, `content safety check input $model=content_safety` runs it.

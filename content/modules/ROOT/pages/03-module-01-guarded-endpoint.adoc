@@ -191,7 +191,7 @@ ask() {  # ask <config_id> "<prompt>": one input-rail verdict, sent through the 
 }
 ----
 
-Expected result: `Live monitor: https://rails-monitor-<you>{tenant_suffix}.{cluster_domain}`.
+Expected result: pass:c,a,q[`Live monitor: https://rails-monitor-<you>{tenant_suffix}.{cluster_domain}`].
 In the browser, OpenShift shows *Authorize Access*: service account `rails-monitor` in your
 project requests `user:info` and `user:check-access`. After *Allow selected permissions*, the
 monitor page shows a green *live* badge, an empty *Evaluation run* panel, and the guardrails

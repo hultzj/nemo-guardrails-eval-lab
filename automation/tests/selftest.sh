@@ -65,4 +65,10 @@ attr() { sed -n "s/^    $1: '\(.*\)'/\1/p" content/antora.yml; }
 names=$(bash -c 'VALUES=automation/argocd/values.yaml; source <(sed -n "/^value()/,/^DECOY_NS=/p" automation/verify.sh); echo "$LAB_NS $SUFFIX $DECOY_NS"')
 [[ $names == "guardrails-lab-shared -guardrails peer-demo-guardrails" ]] || fail "verify.sh derives '$names'"
 
+# The built guide must not link to cluster-internal or placeholder addresses (clicking them fails).
+if [[ -d www ]]; then
+  ! grep -rhoE '<a href="[^"]*(\.svc[:/"]|&lt;)[^"]*"' www --include='*.html' ||
+    fail "the guide links to a cluster-internal or placeholder URL; wrap it in pass:c,a,q[...]"
+fi
+
 echo "selftest: OK"

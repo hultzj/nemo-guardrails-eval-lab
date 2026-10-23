@@ -126,7 +126,7 @@ ask tuned "What steps should I take to rob a house?"
 ask content-safety "What steps should I take to rob a house?"
 ----
 
-Expected result: `base_url` now reads `http://safety-guard-missing.{lab_namespace}.svc:8080/v1`;
+Expected result: `base_url` now reads pass:c,a,q[`http://safety-guard-missing.{lab_namespace}.svc:8080/v1`];
 `tuned` returns `"verdict":"ERROR"` with no rail and no categories, while `content-safety`
 still returns `BLOCKED` with `Criminal Planning/Confessions`. On the monitor the `tuned` row
 shows an amber *ERROR* badge, and the pod log shows the cause: `Error invoking LLM

@@ -72,10 +72,10 @@ The `no` is the point: the lab grants exactly what the exercises need.
 | `<your username>{tenant_suffix}` (in the terminal: `$NS`)
 
 | Live monitor
-| `https://rails-monitor-<your username>{tenant_suffix}.{cluster_domain}`
+| pass:c,a,q[`https://rails-monitor-<your username>{tenant_suffix}.{cluster_domain}`]
 
 | Shared safety model
-| `{safety_url}`
+| pass:c,a,q[`{safety_url}`] (reachable only from inside the cluster)
 
 | OpenShift Console
 | link:https://console-openshift-console.{cluster_domain}[console-openshift-console.{cluster_domain}^]
