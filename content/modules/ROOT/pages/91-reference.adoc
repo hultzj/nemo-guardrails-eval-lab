@@ -19,6 +19,9 @@
 | link:https://huggingface.co/datasets/nvidia/Aegis-AI-Content-Safety-Dataset-2.0[Aegis 2.0 dataset^]
 | 40 of the 50 evaluation prompts (test split, CC BY 4.0). Each line of `eval-dataset` keeps its Aegis id.
 
+| link:https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-14B[DeepSeek-R1-Distill-Qwen-14B^]
+| The general-purpose reasoning model used as the LLM judge in Module 5, served by the workshop's Model-as-a-Service endpoint.
+
 | link:https://github.com/ggml-org/llama.cpp[llama.cpp^]
 | CPU inference for the safety model, with an OpenAI-compatible API.
 
@@ -54,6 +57,10 @@
 | Outage behaviour
 | An unreachable safety model yields no verdict; the client's error handling decides fail-open or fail-closed.
 | `ERROR` verdicts, the pod log's connection error, and the two outage runs.
+
+| LLM judge
+| A prompted LLM judge can match or beat the fine-tuned model on this set, but only once its answers fit NeMo's parser, at about three times the latency; its verdicts vary between runs by about as much as a policy edit changes them.
+| The naive run's false positives next to `explain()` showing the judge answered *No*; the 50-prompt comparison table; the moved prompts after the policy edit, each asked three more times (Module 5).
 |===
 
 == What this lab does not prove
@@ -61,7 +68,8 @@
 * *Production accuracy.* 50 prompts, 40 of them from a dataset the model was trained on, give directional results only. Evaluate on your own traffic.
 * *Output rails.* Only input screening is measured; checking a model's answers is not exercised.
 * *Multilingual coverage.* The set is English. The reference workshop shows weaker results on Korean.
-* *Latency at scale.* The safety model runs quantized on CPU and is shared by everyone in the class.
+* *Latency at scale.* The safety model runs quantized on CPU and is shared by everyone in the class; the LLM judge is a remote endpoint shared beyond it.
+* *Judge stability.* A reasoning model's verdicts on borderline prompts can change between runs, even at temperature 0.
 * *Robustness to adversarial prompts.* Jailbreak and obfuscation attacks are out of scope.
 
 == Further reading

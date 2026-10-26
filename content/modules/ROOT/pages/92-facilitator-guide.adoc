@@ -28,6 +28,9 @@ This lab runs on one shared cluster: every participant, and the presenter, gets 
 | Egress to `huggingface.co` (the 4.9 GB model file, verified by sha256) and `ghcr.io` (llama.cpp image)
 | The `safety-guard` pods reach `Running`
 
+| For Module 5: an API key for the workshop's Model-as-a-Service endpoint, and egress to it (`judge.baseUrl` in `automation/argocd/values.yaml`)
+| `make judge-secret` (below), then `make verify`
+
 | An identity provider participants log in with, and their users
 | `make users` creates them in Keycloak (below)
 |===
@@ -71,6 +74,18 @@ the parent, the components and the Showroom guide all follow it.
 Repeat `status` until every Application shows `Synced` and `Healthy`. The safety model takes
 a few minutes on first start while it downloads and verifies the model file.
 
+. For Module 5, give the shared judge proxy the MaaS API key: the Secret `maas-judge` in
+  `{lab_namespace}`. The key is read from the environment and never printed, and it never goes
+  into a participant's project: participants write the rail configurations that decide where their
+  guardrails server sends requests, so a key there could be redirected to any address. Re-run to
+  rotate the key. Without it, skip Module 5: Modules 1 to 4 do not need it.
++
+[source,bash]
+----
+read -rs MAAS_API_KEY && export MAAS_API_KEY
+make -C automation judge-secret
+----
+
 == Verify every cluster
 
 [source,bash]
@@ -80,7 +95,7 @@ make -C automation verify
 
 Every line must print `PASS`. The checks impersonate each participant and each workbench to
 confirm what they may and may not do, check that every workbench is running with its auth
-sidecar, that the decoy tenant `{decoy_namespace}` refuses anonymous callers, and ask the safety
+sidecar and that no participant project holds a copy of the judge key, that the decoy tenant `{decoy_namespace}` refuses anonymous callers, and ask the safety
 model to classify an unsafe prompt from a tenant namespace. Fix any `FAIL` before participants
 arrive.
 
@@ -94,4 +109,6 @@ OpenShift AI dashboard, and run the pre-flight from xref:02-details.adoc[Prerequ
 * Five participants evaluating at once share four parallel slots per safety-model replica; a content-safety run then takes up to about five minutes instead of two to three.
 * If a participant's monitor shows only `ERROR` verdicts, read its pod log pane first; the cause (a typo in a ConfigMap, a missing `rails.co`) is usually there.
 * A stopped workbench is restarted from the OpenShift AI dashboard (*Workbenches* tab, *Start*); its files survive.
+* The judge proxy spends the facilitator's MaaS key for anyone in the lab's namespaces: participants can send it any prompt for the one model it serves. Tear the lab down, or delete `maas-judge`, when class ends.
+* Module 5's judge is a remote, shared endpoint: about 6 seconds per prompt alone, more when five participants run the 50-prompt cell at once. If MaaS rate-limits or slows past the guardrails proxy's 30-second timeout, prompts come back as `error` and the notebook stops at its `errors == 0` check; have participants run one at a time, or present that section.
 * Anyone with the Showroom URL can read the guide; it contains no credentials. Tear the lab down when class ends.

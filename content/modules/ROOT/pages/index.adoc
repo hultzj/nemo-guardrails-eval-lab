@@ -6,7 +6,7 @@ Prove what your guardrails block, what they let through, and why: one request at
 Guardrails sit between users and a model and decide which prompts may pass. Shipping them
 without measurement means you know neither how much harmful traffic slips through nor how
 many legitimate users you turn away. This lab builds NeMo Guardrails on OpenShift AI, adds an
-NVIDIA content-safety model, and measures both configurations against a labelled prompt set,
+NVIDIA content-safety model and an LLM judge, and measures every configuration against a labelled prompt set,
 while a live monitor shows each decision, the rail that made it, and the guardrails server
 log as it happens.
 
@@ -16,6 +16,7 @@ The lab progresses through these tasks:
 . Add the Nemotron Safety Guard model as a second rail and compare the two on the same prompts.
 . Evaluate both configurations on 50 labelled prompts and read precision, recall and false-positive rate.
 . Try to tune the policy, measure whether it changed anything, and find out what happens when the safety model goes away.
+. Use a prompted LLM as the judge, fix how its answers are read, and measure what a policy edit costs.
 
 == Learning objectives
 
@@ -26,6 +27,7 @@ By the end of the lab you will be able to:
 * Run a labelled evaluation and interpret precision, recall, F1, false-positive rate and false-negative rate.
 * Show that a configuration change is not a behaviour change until an evaluation confirms it.
 * Explain whether your guardrails fail open or fail closed when the safety model is unavailable, and who decides.
+* Compare a fine-tuned safety model with a prompted LLM judge on accuracy, latency and control over the policy.
 
 == How to run the lab
 
@@ -36,7 +38,7 @@ result before continuing. Facilitators: see
 xref:92-facilitator-guide.adoc[Facilitator Guide].
 
 Presenters: the same pages work as a live demo. Keep the live monitor on screen next to the
-terminal; every command in Modules 1 to 4 shows up on it within a second.
+terminal; every command in Modules 1 to 4 shows up on it within a second, and in Module 5 as soon as the judge answers (several seconds).
 
 == Lab map
 
@@ -59,15 +61,20 @@ terminal; every command in Modules 1 to 4 shows up on it within a second.
 | 4. Tune and break
 | Evidence that prompt-level policy edits do not change the model's verdicts; fail-open versus fail-closed measured during a safety-model outage
 | 25 min
+
+| 5. An LLM as the judge
+| A remote LLM wired in as a `self check input` judge through a proxy that keeps its API key out of your project; a silent parsing failure found and fixed; three judges compared; a policy edit measured against the judge's noise
+| 30 min
 |===
 
-*Total:* about 90 minutes.
+*Total:* about 2 hours. Modules 1 to 4 stand alone as a 90-minute lab.
 
 == Technical model
 
 * *NeMo Guardrails server*: runs named rail configurations (ConfigMaps) and answers an OpenAI-style chat API with a verdict; deployed by the TrustyAI operator from a `NemoGuardrails` resource.
 * *Pattern rails*: regular expressions and Presidio named-entity detection; fast and predictable, blind to meaning.
 * *Content-safety rail*: asks the Nemotron Safety Guard model whether a prompt is unsafe and in which of 23 categories; sees meaning, costs a model call, and can be wrong.
+* *LLM judge*: a general-purpose LLM asked, through a policy prompt you write, whether a prompt should be blocked; a policy you control, at the price of a remote model call and an answer that must be parsed.
 * *Live monitor*: a pass-through proxy in your namespace that records every verdict and streams it, with the guardrails pod log, to your browser.
 * *Workbench*: an OpenShift AI JupyterLab in your project: a terminal for the platform steps, notebooks for the measurements (they send the labelled prompt set through the monitor and compute the metrics).
 

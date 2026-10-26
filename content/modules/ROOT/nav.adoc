@@ -2,11 +2,12 @@
 * xref:01-overview.adoc[Architecture and Control Boundaries]
 * xref:02-details.adoc[Prerequisites and Environment]
 
-.Evaluating guardrails (90 minutes)
+.Evaluating guardrails (about 2 hours)
 * xref:03-module-01-guarded-endpoint.adoc[Module 1: Stand up a guarded endpoint]
 * xref:04-module-02-content-safety.adoc[Module 2: Add a content-safety model]
 * xref:05-module-03-evaluate.adoc[Module 3: Evaluate]
 * xref:06-module-04-tune-and-break.adoc[Module 4: Tune and break]
+* xref:07-module-05-llm-judge.adoc[Module 5: An LLM as the judge]
 
 .Wrap-up
 * xref:90-cleanup.adoc[Cleanup]

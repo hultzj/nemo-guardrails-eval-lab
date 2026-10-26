@@ -104,6 +104,21 @@ req = urllib.request.Request(f"https://rails-monitor.{ns}.svc:8443/healthz", hea
 sys.exit(0 if json.load(urllib.request.urlopen(req, context=ctx, timeout=15)).get("ok") else 1)'
 }
 
+# The judge answers one chat completion through the shared judge proxy, asked from a tenant pod
+# without any key: the proxy alone holds it (Secret maas-judge in the lab namespace).
+judge_answers() {
+  local ns=$1
+  oc -n "$ns" exec deploy/rails-monitor -c monitor -- python3 -c '
+import json, sys, urllib.request
+body = {"model": "", "max_tokens": 16, "messages": [{"role": "user", "content": "Reply with one word: Yes or No?"}]}
+req = urllib.request.Request(sys.argv[1], json.dumps(body).encode(), {"Content-Type": "application/json"})
+sys.exit(0 if json.load(urllib.request.urlopen(req, timeout=60)).get("choices") else 1)
+' "http://judge-proxy.$LAB_NS.svc:8080/v1/chat/completions"
+}
+
+# A tenant must never hold the key: its participant controls the rail configs that say where it goes.
+no_judge_key_in() { [[ $(oc -n "$1" get secret maas-judge 2>&1) == *NotFound* ]]; }  # not a pipe: pipefail
+
 # The workbench pod is up with the injected auth sidecar (the gateway route needs it).
 workbench_ready() {
   local ns=$1
@@ -135,6 +150,20 @@ check "safety model rolled out" oc -n "$LAB_NS" rollout status deploy/safety-gua
 check "TrustyAI NemoGuardrails CRD present" oc get crd nemoguardrails.trustyai.opendatahub.io
 check "decoy guardrails ($DECOY_NS) rolled out" oc -n "$DECOY_NS" rollout status deploy/nemoguardrails --timeout=10s
 check "decoy guardrails route refuses anonymous callers" route_refuses_anonymous "$DECOY_NS" nemoguardrails
+# Module 5 is optional: without the judge key, say so once instead of failing.
+# Only NotFound means "no key"; any other error (Forbidden, API down) must not pass as a skip.
+judge=false
+if out=$(oc -n "$LAB_NS" get secret maas-judge -o name 2>&1); then
+  judge=true
+elif [[ $out == *NotFound* ]]; then
+  echo "SKIP: no Secret maas-judge in $LAB_NS; Module 5 is unavailable until make judge-secret"
+else
+  echo "FAIL: cannot tell whether Secret maas-judge exists in $LAB_NS (Module 5)"
+  failed=1
+fi
+if $judge; then
+  check "judge proxy rolled out" oc -n "$LAB_NS" rollout status deploy/judge-proxy --timeout=10s
+fi
 first=true
 for u in $USERS; do
   ns="$u$SUFFIX"
@@ -159,8 +188,12 @@ for u in $USERS; do
     check "$u: cannot read secrets" cannot "$u" get secrets -n "$ns"
     check "$u: cannot create nemoguardrails in the decoy tenant" cannot "$u" create nemoguardrails.trustyai.opendatahub.io -n "$DECOY_NS"
   fi
+  check "$u: holds no copy of the judge key" no_judge_key_in "$ns"
   if $first; then
     check "safety model classifies an unsafe prompt (from $ns)" safety_model_classifies "$ns"
+    if $judge; then
+      check "LLM judge answers through the judge proxy (from $ns, without a key)" judge_answers "$ns"
+    fi
     first=false
   fi
 done

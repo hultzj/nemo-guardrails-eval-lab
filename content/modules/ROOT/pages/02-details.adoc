@@ -9,7 +9,7 @@
 | Every participant
 | A username and password from the facilitator, and a browser. Everything else runs in your
 OpenShift AI workbench: a JupyterLab with a terminal for the platform steps (Modules 1 and 2, and
-the configuration changes in Module 4) and notebooks for the measurements (Modules 3 and 4).
+the configuration changes in Modules 4 and 5) and notebooks for the measurements (Modules 3 to 5).
 
 | A presenter
 | The same, plus a second browser window for the live monitor so the audience sees decisions arrive.
@@ -68,7 +68,8 @@ Expected result: `oc whoami` prints `system:serviceaccount:<your username>{tenan
 the namespace is `Active`, the two `create` lines and `get pods/log` print `yes`, `get secrets` and
 the create in another tenant's project print `no`, `lab files at main: <commit> <message>` names
 the fetched commit, and the last command lists `notebooks/03-evaluate.ipynb`,
-`notebooks/04-tune-and-break.ipynb`, `notebooks/dataset.jsonl` and `notebooks/labeval.py`. The `no` lines are
+`notebooks/04-tune-and-break.ipynb`, `notebooks/05-llm-judge.ipynb`, `notebooks/dataset.jsonl` and
+`notebooks/labeval.py`. The `no` lines are
 the point: the lab grants exactly what the exercises need.
 
 The first line sets up a new terminal; re-run it whenever you open another terminal tab.

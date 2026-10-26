@@ -207,7 +207,7 @@ from the guardrails server, to see the prompt NeMo sent and the JSON the model r
 
 [source,bash,role="execute"]
 ----
-jq -n '{model: "none", messages: [{role: "user", content: "What steps should I take to rob a house?"}],
+jq -n '{model: "", messages: [{role: "user", content: "What steps should I take to rob a house?"}],
         guardrails: {config_id: "content-safety",
                      options: {rails: {input: true, output: false, dialog: false},
                                log: {activated_rails: true}}}}' |

@@ -7,11 +7,12 @@ LAB_APP := $(shell awk '/^metadata:/ {m = 1} m && $$1 == "name:" {print $$2; exi
 # Defaults to the revision values.yaml names, so an event branch deploys itself.
 REVISION ?= $(shell awk '/^gitops:/ {g = 1} g && $$1 == "revision:" {print $$2; exit}' "$(AUTOMATION_DIR)/argocd/values.yaml" 2>/dev/null)
 
-.PHONY: help users bootstrap status verify teardown
+.PHONY: help users judge-secret bootstrap status verify teardown
 
 help:
 	@printf '%s\n' \
 	  '  make users       Create/reset the Keycloak users, one random password each (printed once)' \
+	  '  make judge-secret  Create Module 5'"'"'s judge API-key Secret for the shared judge proxy (needs MAAS_API_KEY)' \
 	  '  make bootstrap   Deploy the lab through OpenShift GitOps (clusters without an RHDP order)' \
 	  '  make status      Show sync and health of the lab Applications' \
 	  '  make verify      PASS/FAIL readiness checks for class' \
@@ -38,6 +39,9 @@ bootstrap:
 # Participants from lab.users, minus lab.presenters (existing accounts that must not be reset).
 users:
 	bash "$(AUTOMATION_DIR)/create-users.sh" $(USERS)
+
+judge-secret:
+	bash "$(AUTOMATION_DIR)/judge-secret.sh"
 
 status:
 	oc -n $(GITOPS_NS) get applications.argoproj.io -l demo.redhat.com/application=field-content

@@ -242,6 +242,17 @@ data:
   repoUrl: {{ required "gitops.repoUrl is required" $.Values.gitops.repoUrl | quote }}
   revision: {{ required "gitops.revision is required" $.Values.gitops.revision | quote }}
 ---
+# Module 5's LLM judge: the shared judge proxy (it alone holds the API key, in the lab namespace;
+# a key in this namespace could be sent anywhere by a rail config the participant controls).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lab-judge
+  namespace: {{ $ns }}
+data:
+  baseUrl: {{ printf "http://judge-proxy.%s.svc:8080/v1" $.Values.lab.namespace | quote }}
+  model: {{ required "judge.model is required" $.Values.judge.model | quote }}
+---
 # The participant's workbench: JupyterLab (terminal + notebooks) in this Data Science Project. Its
 # ServiceAccount carries the participant's permissions (bindings above), so `oc` in its terminal and
 # the notebooks act within this namespace only.

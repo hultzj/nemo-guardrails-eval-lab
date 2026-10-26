@@ -205,4 +205,4 @@ Before continuing, verify that you can answer:
 * The client that calls the guardrails. Make the choice explicit in your application, and monitor for `ERROR` verdicts so an outage is visible.
 ====
 
-Proceed to xref:90-cleanup.adoc[Cleanup].
+Proceed to xref:07-module-05-llm-judge.adoc[Module 5: An LLM as the judge].

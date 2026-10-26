@@ -4,6 +4,7 @@ safetyModel: {}
 images: {}
 workbench: {}
 gitops: {}
+judge: {}
 argocdNamespace: openshift-gitops
 partOf: ""
 deployer:

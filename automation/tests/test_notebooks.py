@@ -36,10 +36,28 @@ class NotebookGuards(unittest.TestCase):
         for name in ("03-evaluate.ipynb", "04-tune-and-break.ipynb"):
             setup = "\n".join(sections(name)["1"])
             self.assertIn('lab.require_configs("regex-only", "content-safety")', setup, name)
+        setup5 = "\n".join(sections("05-llm-judge.ipynb")["1"])
+        self.assertIn('lab.require_configs("regex-only", "content-safety", "self-check")', setup5)
+
+    def test_module5_measurements_are_checked(self):
+        src = "\n".join(sum(sections("05-llm-judge.ipynb").values(), []))
+        for var in ("first", "judge"):
+            self.assertRegex(src, rf'{var} = lab\.evaluate\("self-check"')
+            self.assertRegex(src, rf'assert {var}\["errors"\] == 0')
+        self.assertIn('assert b["errors"] == 0', src)  # remembered or re-measured baselines
+        # the edit is measured as its own config, so the original policy stays live for the re-asks
+        self.assertIn('edited = lab.evaluate("self-check-edited", rows', src)
+        self.assertIn('assert edited["errors"] == 0', src)
+        self.assertIn('for config in ("self-check", "self-check-edited"):', src)
+        self.assertIn('assert again[config]["errors"] == 0', src)
+        self.assertIn('assert cs_ten["errors"] == 0', src)  # no error timings in the latency table
+        self.assertNotIn('"model": "none"', src)
+        # section 2 explains the run's own false positives, not one fixed prompt the judge may get right
+        self.assertIn('lab.explain("self-check", r["prompt"])', "\n".join(sections("05-llm-judge.ipynb")["2"]))
 
     def test_every_measurement_asserts_it_got_verdicts(self):
         # every full-dataset evaluate() result is checked before it is compared or reported
-        for name in ("03-evaluate.ipynb", "04-tune-and-break.ipynb"):
+        for name in ("03-evaluate.ipynb", "04-tune-and-break.ipynb", "05-llm-judge.ipynb"):
             for src in cells(name):
                 for var in re.findall(r"^(\w+) = lab\.evaluate\([^)]*\brows\b", src, re.M):
                     self.assertRegex(src, rf'assert {var}\["errors"\] == 0', f"{name}: {var} unchecked")

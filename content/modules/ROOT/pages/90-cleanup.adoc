@@ -3,7 +3,7 @@
 
 == Remove what you created
 
-You created a `NemoGuardrails` resource and three rail ConfigMaps. Look at them first, then
+You created a `NemoGuardrails` resource and five rail ConfigMaps. Look at them first, then
 delete them, from your workbench terminal. The workbench, its files (the cloned lab and your
 notebook results), the live monitor and your project belong to the lab and stay.
 
@@ -11,11 +11,13 @@ notebook results), the live monitor and your project belong to the lab and stay.
 ----
 NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
 oc -n $NS get nemoguardrails -o name
-oc -n $NS get configmap regex-only content-safety tuned -o name
+oc -n $NS get configmap regex-only content-safety tuned self-check self-check-edited -o name
 ----
 
 Expected result: `nemoguardrails.trustyai.opendatahub.io/nemoguardrails`, and
-`configmap/regex-only`, `configmap/content-safety`, `configmap/tuned`.
+`configmap/regex-only`, `configmap/content-safety`, `configmap/tuned`, `configmap/self-check`,
+`configmap/self-check-edited`
+(a configuration from a module you skipped is reported `NotFound`).
 
 [CAUTION]
 ====
@@ -25,12 +27,12 @@ The next block deletes them. Your workbench keeps running: the lab owns it.
 [source,bash,role="execute"]
 ----
 oc -n $NS delete nemoguardrails nemoguardrails --ignore-not-found --wait=true
-oc -n $NS delete configmap regex-only content-safety tuned --ignore-not-found
+oc -n $NS delete configmap regex-only content-safety tuned self-check self-check-edited --ignore-not-found
 oc -n $NS get deploy,route -o name
 ----
 
-Expected result: four `deleted` lines (`nemoguardrails`, `regex-only`, `content-safety`,
-`tuned`), and the last command lists only `deployment.apps/rails-monitor` and
+Expected result: one `deleted` line for each resource you created (`nemoguardrails`,
+`regex-only`, `content-safety`, `tuned`, and from Module 5 `self-check` and `self-check-edited`), and the last command lists only `deployment.apps/rails-monitor` and
 `route.route.openshift.io/rails-monitor`: the operator removed the guardrails Deployment, Service
 and Route with the resource. (The workbench runs as a StatefulSet, so it is not in this list.)
 

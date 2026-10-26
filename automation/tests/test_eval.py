@@ -40,6 +40,7 @@ RUNS = [  # what GET /api/runs returns: two complete content-safety runs, one pa
 
 class Monitor(BaseHTTPRequestHandler):
     headers_seen = []
+    bodies = []
 
     def log_message(self, *args):
         pass
@@ -54,6 +55,16 @@ class Monitor(BaseHTTPRequestHandler):
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         Monitor.headers_seen.append(dict(self.headers))
+        Monitor.bodies.append(body)
+        if body["messages"][0]["content"] == "explain-me":  # a judge that answered in a sentence
+            data = json.dumps({"guardrails": {"output_data": {"triggered_input_rail": "self check input"},
+                                              "log": {"activated_rails": [{"name": "self check input", "executed_actions": [
+                                                  {"llm_calls": [{"completion": "The message should not be blocked. Answer: No"}]}]}]}}}).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
         how = ROWS[body["messages"][0]["content"]][1]
         if how == "dropped":  # close before any response: RemoteDisconnected in the client
             self.close_connection = True
@@ -165,6 +176,22 @@ class EvalTest(unittest.TestCase):
                "metrics": lab.metrics(counts)}
         self.assertIn("WARNING: 50 of 50 prompts got no verdict", lab.summary(res))
         self.assertNotIn("WARNING", lab.summary({**res, "errors": 0}))
+
+
+    def test_requests_let_the_config_choose_its_model_and_return_details(self):
+        lab = self.lab()
+        lab.evaluate("t", lab.load_rows(self.dataset)[:1], url=f"http://127.0.0.1:{self.srv.server_port}", progress=None)
+        sent = Monitor.bodies[-1]
+        self.assertEqual(sent["model"], "")  # a non-empty model would override a judge's own model
+        self.assertTrue(sent["guardrails"]["options"]["output_vars"])  # verdict details without the monitor
+
+    def test_explain_shows_the_judges_own_words(self):
+        lab = self.lab()
+        out = lab.explain("self-check", "explain-me", url=f"http://127.0.0.1:{self.srv.server_port}")
+        self.assertEqual(out["verdict"], "blocked")
+        self.assertEqual(out["llm_calls"], [{"rail": "self check input",
+                                              "answer": "The message should not be blocked. Answer: No"}])
+        self.assertTrue(Monitor.bodies[-1]["guardrails"]["options"]["log"]["llm_calls"])
 
 
 if __name__ == "__main__":

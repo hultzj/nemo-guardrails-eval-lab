@@ -60,10 +60,14 @@ def evaluate(config, rows, errors_as="allowed", run=None, url=None, progress=pri
     ctx = ssl.create_default_context(cafile=f"{SA}/service-ca.crt") if url.startswith("https") else None
     counts, results, auth = {"TP": 0, "FP": 0, "FN": 0, "TN": 0}, [], token()
     for i, row in enumerate(rows, 1):
-        body = {"model": "guardrails", "messages": [{"role": "user", "content": row["prompt"]}],
+        # model "": the server then uses the config's own main model (a judge, Module 5); a non-empty
+        # value would override it. Configs without a main model ignore the field.
+        body = {"model": "", "messages": [{"role": "user", "content": row["prompt"]}],
                 "guardrails": {"config_id": config,
-                               # input rails only: the verdict, no generation, so no main LLM is needed
-                               "options": {"rails": {"input": True, "output": False, "dialog": False}}}}
+                               # input rails only: the verdict, no generation; output_vars returns the
+                               # verdict details (which rail, categories) whether or not the monitor adds them
+                               "options": {"rails": {"input": True, "output": False, "dialog": False},
+                                           "output_vars": True}}}
         req = urllib.request.Request(url, json.dumps(body).encode(), {
             "Content-Type": "application/json", "Authorization": f"Bearer {auth}",
             "X-Eval-Run": run, "X-Eval-Label": row["label"], "X-Eval-Total": str(len(rows)),
@@ -119,7 +123,7 @@ def require_configs(*ids, url=None):
     if missing:
         raise RuntimeError(f"Your guardrails server has {have} but not {missing}. Run the module "
                            "that creates it first (Module 1: regex-only, Module 2: content-safety, "
-                           "Module 4 Exercise 1: tuned).")
+                           "Module 4 Exercise 1: tuned, Module 5: self-check, then self-check-edited).")
     return have
 
 
@@ -136,6 +140,26 @@ def latest_run(runs, config, n):
     counts = {k: r[k.lower()] for k in ("TP", "FP", "FN", "TN")}
     return {"run": r["run"], "config": config, "errors_as": r.get("errors_as", "allowed"),
             "counts": counts, "errors": r["errors"], "metrics": metrics(counts), "results": []}
+
+
+def explain(config, prompt, url=None):
+    """One prompt through the monitor with the rails' LLM calls logged: the verdict NeMo derived,
+    and what each model actually answered (the judge's own words, before NeMo parses them)."""
+    url = (url or monitor_url()) + "/v1/chat/completions"
+    ctx = ssl.create_default_context(cafile=f"{SA}/service-ca.crt") if url.startswith("https") else None
+    body = {"model": "", "messages": [{"role": "user", "content": prompt}],
+            "guardrails": {"config_id": config, "options": {
+                "rails": {"input": True, "output": False, "dialog": False}, "output_vars": True,
+                "log": {"activated_rails": True, "llm_calls": True}}}}
+    req = urllib.request.Request(url, json.dumps(body).encode(),
+                                 {"Content-Type": "application/json", "Authorization": f"Bearer {token()}"})
+    g = json.load(urllib.request.urlopen(req, context=ctx, timeout=120)).get("guardrails") or {}
+    od = g.get("output_data") or {}
+    calls = [{"rail": a.get("name"), "answer": c.get("completion")}
+             for a in (g.get("log") or {}).get("activated_rails") or []
+             for e in a.get("executed_actions") or [] for c in e.get("llm_calls") or []]
+    verdict = "error" if not od else ("blocked" if od.get("triggered_input_rail") else "allowed")
+    return {"prompt": prompt, "verdict": verdict, "rail": od.get("triggered_input_rail"), "llm_calls": calls}
 
 
 def summary(res):

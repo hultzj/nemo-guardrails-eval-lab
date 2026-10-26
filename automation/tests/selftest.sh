@@ -49,6 +49,21 @@ wb=$(helm template lab automation/argocd/components/tenants -f automation/argocd
 src=$(sed -n '/name: lab-source$/,/^---$/p' <<<"$wb" | grep -E '^  (repoUrl|revision):')
 [[ $src == *'revision: "event-x"'* ]] || fail "lab-source revision does not follow gitops.revision"
 [[ $src == *"repoUrl: \"$(sed -n 's/^  repoUrl: //p' automation/argocd/values.yaml)\""* ]] || fail "lab-source repoUrl is not gitops.repoUrl"
+# Module 5: tenants call the shared judge proxy, which alone gets the key; the URL and model follow judge.*.
+grep -q 'model: openai/deepseek-r1-distill-qwen-14b' <<<"$tenants_app" || fail "parent does not pass judge to tenants"
+ns=$(sed -n "/^lab:/,/^[^ #]/s/^  namespace: *//p" automation/argocd/values.yaml)
+jd=$(helm template lab automation/argocd/components/tenants -f automation/argocd/values.yaml --set partOf=lab \
+  --set judge.model=m-x | sed -n '/name: lab-judge$/,/^---$/p')
+[[ $jd == *"baseUrl: \"http://judge-proxy.$ns.svc:8080/v1\""* && $jd == *'model: "m-x"'* ]] ||
+  fail "lab-judge does not point at the judge proxy with judge.model"
+grep -qiE 'kind: Secret|api-?key|secretKeyRef' <<<"$wb" && fail "the tenants chart renders a Secret or an API key reference"
+jp=$(helm template lab automation/argocd/components/safety-model -f automation/argocd/values.yaml --set partOf=lab \
+  --set judge.baseUrl=https://judge.example/v1 --set judge.model=m-x)
+grep -q 'value: "https://judge.example/v1"' <<<"$jp" && grep -q 'value: "m-x"' <<<"$jp" ||
+  fail "the judge proxy does not follow judge.*"
+grep -q 'secret: {secretName: maas-judge, optional: true}' <<<"$jp" ||
+  fail "the judge proxy must mount maas-judge optionally (Modules 1 to 4 run without it)"
+grep -q 'name: judge-proxy-lab-only' <<<"$jp" || fail "the judge proxy has no lab-only NetworkPolicy"
 grep -q 'git fetch -q --depth 1 "$REPO" "$REV" && git checkout -q --detach FETCH_HEAD' content/modules/ROOT/pages/02-details.adoc ||
   fail "the guide does not fetch the deployed revision"
 # ... and that fetch works for a branch, a tag-like ref and a bare commit, into a new or existing checkout.
@@ -95,5 +110,38 @@ if [[ -d www ]]; then
   ! grep -rhoE '<a href="[^"]*(\.svc[:/"]|&lt;)[^"]*"' www --include='*.html' ||
     fail "the guide links to a cluster-internal or placeholder URL; wrap it in pass:c,a,q[...]"
 fi
+
+# verify.sh runs Module 5's checks only when the judge key exists, and flags a key in a tenant (stub oc;
+# every other command succeeds silently, so only the judge lines are asserted).
+stub=$(mktemp -d)
+cat >"$stub/oc" <<'STUB'
+#!/usr/bin/env bash
+case "$*" in
+  *"get secret maas-judge"*)
+    [[ -n ${STUB_JUDGE_NS-} && "$*" == *"-n $STUB_JUDGE_NS "* ]] && { echo secret/maas-judge; exit 0; }
+    [[ -n ${STUB_FORBIDDEN-} ]] && { echo 'Error from server (Forbidden): secrets "maas-judge" is forbidden' >&2; exit 1; }
+    echo 'Error from server (NotFound): secrets "maas-judge" not found' >&2; exit 1 ;;
+esac
+exit 0
+STUB
+printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/curl"
+chmod +x "$stub/oc" "$stub/curl"
+lab_ns=$(sed -n "/^lab:/,/^[^ #]/s/^  namespace: *//p" automation/argocd/values.yaml)
+out=$(PATH="$stub:$PATH" USERS="ua ub" PRESENTERS="" bash automation/verify.sh 2>&1 || true)  # other checks fail against the stub
+[[ $(grep -c '^SKIP: no Secret maas-judge' <<<"$out") == 1 ]] || fail "verify.sh without the judge key must SKIP Module 5 once"
+grep -E 'judge proxy|LLM judge' <<<"$out" && fail "verify.sh ran judge checks without the judge key"
+grep -E '^FAIL: .*judge' <<<"$out" && fail "a missing judge key must not fail verify.sh (Module 5 is optional)"
+grep -q '^PASS: ua: holds no copy of the judge key' <<<"$out" || fail "verify.sh does not check tenants hold no judge key"
+out=$(PATH="$stub:$PATH" STUB_JUDGE_NS="$lab_ns" USERS="ua ub" PRESENTERS="" bash automation/verify.sh 2>&1 || true)  # other checks fail against the stub
+grep -q '^SKIP: no Secret maas-judge' <<<"$out" && fail "verify.sh skipped Module 5 although the judge key exists"
+grep -q '^PASS: judge proxy rolled out' <<<"$out" && grep -q '^PASS: LLM judge answers through the judge proxy' <<<"$out" ||
+  fail "verify.sh did not check the judge proxy"
+[[ $(grep -c 'LLM judge answers' <<<"$out") == 1 ]] || fail "the judge completion must be asked once, not per tenant"
+out=$(PATH="$stub:$PATH" STUB_JUDGE_NS="ub-guardrails" USERS="ua ub" PRESENTERS="" SUFFIX=-guardrails bash automation/verify.sh 2>&1 || true)  # other checks fail against the stub
+grep -q '^FAIL: ub: holds no copy of the judge key' <<<"$out" || fail "verify.sh misses a judge key in a tenant"
+out=$(PATH="$stub:$PATH" STUB_FORBIDDEN=1 USERS="ua" PRESENTERS="" bash automation/verify.sh 2>&1 || true)  # other checks fail against the stub
+grep -q '^FAIL: cannot tell whether Secret maas-judge exists' <<<"$out" && ! grep -q '^SKIP: no Secret maas-judge' <<<"$out" ||
+  fail "verify.sh must fail, not skip, when it cannot look up the judge key"
+rm -rf "$stub"
 
 echo "selftest: OK"

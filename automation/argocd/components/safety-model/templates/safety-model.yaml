@@ -112,3 +112,88 @@ spec:
               app.kubernetes.io/part-of: {{ .Values.partOf }}
       ports:
         - {port: 8080, protocol: TCP}
+---
+# Module 5's judge proxy: the only place the judge endpoint's API key lives (Secret maas-judge,
+# created by make judge-secret, never in git). Tenants call it without a key; it pins the model.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: judge-proxy-app
+  namespace: {{ .Values.lab.namespace }}
+data:
+  judge_proxy.py: |
+{{ .Files.Get "files/judge_proxy.py" | indent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: judge-proxy
+  namespace: {{ .Values.lab.namespace }}
+  labels: {app: judge-proxy}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: judge-proxy}
+  template:
+    metadata:
+      labels: {app: judge-proxy}
+      annotations:
+        checksum/app: {{ .Files.Get "files/judge_proxy.py" | sha256sum | trunc 16 }}
+    spec:
+      automountServiceAccountToken: false
+      volumes:
+        - name: app
+          configMap: {name: judge-proxy-app}
+        # optional: Modules 1 to 4 need no key; without it the proxy answers 503
+        - name: key
+          secret: {secretName: maas-judge, optional: true}
+      containers:
+        - name: proxy
+          image: {{ .Values.images.python }}
+          command: ["python3", "-u", "/app/judge_proxy.py"]
+          env:
+            - {name: JUDGE_URL, value: {{ required "judge.baseUrl is required" .Values.judge.baseUrl | quote }}}
+            - {name: JUDGE_MODEL, value: {{ required "judge.model is required" .Values.judge.model | quote }}}
+            - {name: KEY_FILE, value: /secret/api-key}
+          ports:
+            - {name: http, containerPort: 8080}
+          volumeMounts:
+            - {name: app, mountPath: /app}
+            - {name: key, mountPath: /secret, readOnly: true}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {memory: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: judge-proxy
+  namespace: {{ .Values.lab.namespace }}
+spec:
+  selector: {app: judge-proxy}
+  ports:
+    - {name: http, port: 8080, targetPort: http}
+---
+# The proxy spends the facilitator's key: only this lab's namespaces may reach it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: judge-proxy-lab-only
+  namespace: {{ .Values.lab.namespace }}
+spec:
+  podSelector:
+    matchLabels: {app: judge-proxy}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: {{ .Values.partOf }}
+      ports:
+        - {port: 8080, protocol: TCP}

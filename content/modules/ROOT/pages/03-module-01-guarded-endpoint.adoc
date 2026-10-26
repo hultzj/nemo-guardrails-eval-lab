@@ -180,7 +180,7 @@ MON=https://$(oc -n $NS get route rails-monitor -o jsonpath='{.spec.host}')
 echo "Live monitor: $MON"
 ask() {  # ask <config_id> "<prompt>": one input-rail verdict, sent through the live monitor
   jq -n --arg c "$1" --arg p "$2" \
-    '{model: "none", messages: [{role: "user", content: $p}],
+    '{model: "", messages: [{role: "user", content: $p}],
       guardrails: {config_id: $c, options: {rails: {input: true, output: false, dialog: false}}}}' |
   curl -sk "$MON/v1/chat/completions" -H "Authorization: Bearer $(oc whoami -t)" \
     -H 'Content-Type: application/json' -d @- |

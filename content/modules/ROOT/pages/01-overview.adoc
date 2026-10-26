@@ -8,6 +8,7 @@
 * *How good are my guardrails, in numbers?* Module 3 measures precision, recall and false-positive rate on a labelled set.
 * *Did my tuning change anything?* Module 4 re-measures after a policy edit.
 * *What happens when the safety model is down?* Module 4 measures fail-open and fail-closed behaviour.
+* *Can a prompted LLM judge, with a policy I write, do better, and at what cost?* Module 5 measures one against the other two.
 
 == The stack
 
@@ -20,12 +21,16 @@
 | Loads every rail configuration listed in the resource and answers `/v1/chat/completions` and `/v1/guardrail/checks` with a verdict. Only callers allowed to `get services` in your namespace get through.
 
 | Rail configurations
-| ConfigMaps you write: `regex-only`, `content-safety`, `tuned`
+| ConfigMaps you write: `regex-only`, `content-safety`, `tuned`, `self-check`, `self-check-edited`
 | Which rails run, in which order, with which patterns and prompts. A request picks one with `config_id`.
 
 | Safety model (shared)
 | {safety_model} served on CPU by llama.cpp in `{lab_namespace}`
 | Classifies a prompt as safe or unsafe against 23 categories (violence, criminal planning, PII/privacy and others) and names the categories.
+
+| LLM judge (remote)
+| A general-purpose reasoning model, `deepseek-r1-distill-qwen-14b`, on the workshop's Model-as-a-Service endpoint, reached through the shared judge proxy in `{lab_namespace}`, which alone holds the API key
+| Answers NeMo's `self check input` rail: should this message be blocked under the policy in your prompt?
 
 | Live monitor
 | `rails-monitor` in your namespace, behind OpenShift login
@@ -36,13 +41,14 @@
 | A terminal for the platform steps, and notebooks for the measurements.
 
 | Evaluation
-| Notebooks `03-evaluate.ipynb` and `04-tune-and-break.ipynb`, the code in `labeval.py`, and `dataset.jsonl` (50 labelled prompts)
+| Notebooks `03-evaluate.ipynb`, `04-tune-and-break.ipynb` and `05-llm-judge.ipynb`, the code in `labeval.py`, and `dataset.jsonl` (50 labelled prompts)
 | Sends every prompt through the monitor, compares each verdict with its label, and shows the metrics, confusion matrices and misclassified prompts.
 |===
 
-There is no main LLM in this lab. Every request asks only for the input rails' verdict, so a
-blocked prompt gets a refusal and an allowed prompt is echoed back unchanged. That keeps the
-lab free of API keys and makes every measurement about the guardrails alone.
+No request generates an answer. Every request asks only for the input rails' verdict, so a
+blocked prompt gets a refusal and an allowed prompt is echoed back unchanged; that keeps every
+measurement about the guardrails alone. Only Module 5 configures an LLM, and only as the judge,
+with an API key you never see.
 
 == The one distinction to understand: a pattern rail versus a model rail
 
@@ -73,6 +79,10 @@ Run the 50-prompt evaluation against each configuration and read the confusion m
 === 4. Tune and break
 
 Edit the safety policy and measure the effect, then cut the safety model off and measure what a client receives.
+
+=== 5. An LLM as the judge
+
+Wire a remote LLM in as a `self check input` judge, fix the contract between its prompt and NeMo's parser, compare all three judges, and measure a policy edit.
 
 == Interpretation guardrails
 
