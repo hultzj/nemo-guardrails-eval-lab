@@ -27,6 +27,9 @@ change ConfigMaps and `NemoGuardrails` resources. Nothing else, and nothing outs
 
 == Open your workbench
 
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::lab-open-workbench.mp4[width=100%]
+
 . Open the OpenShift AI dashboard, `https://rh-ai.{cluster_domain}`, and log in with *keycloak* and your username and password.
 . In the left menu click *Projects*, then your project, *<your username>: guardrails lab*.
 . Open the *Workbenches* tab. The row *guardrails-lab* shows the image *Jupyter | TrustyAI | CPU | Python 3.12*, *3.5*, *Latest*, and the status *Ready*. Click the workbench name, *guardrails-lab*: JupyterLab opens in a new browser tab.
@@ -37,6 +40,9 @@ pass:c,a,q[`https://rh-ai.{cluster_domain}/notebook/<your username>{tenant_suffi
 file browser on the left.
 
 == Get the lab files and run the pre-flight check
+
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::lab-preflight.mp4[width=100%]
 
 In JupyterLab choose *File > New > Terminal*. Run the block below in that terminal: it fetches the
 lab files onto your workbench's storage (they survive a workbench restart), from the repository

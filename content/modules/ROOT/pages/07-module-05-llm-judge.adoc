@@ -51,6 +51,9 @@ message should be blocked. NeMo parses the answer with its `is_content_safe` par
 
 == Exercise 1: Wire the judge in
 
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m5-ex1.mp4[width=100%]
+
 Write the `self-check` configuration with the judge proxy's address and model from `lab-judge`,
 and add it to your server. Nothing in your project holds the key.
 
@@ -123,11 +126,15 @@ including `self-check`.
 
 == Exercise 2: Measure, and read what the judge actually said
 
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m5-ex2.mp4[width=100%]
+
 Run the cells under *2. After Exercise 1*: ten prompts through the judge, then every safe prompt it
 blocked, asked once more, with NeMo's verdict printed above the judge's own answer.
 
-Expected result: nearly every prompt is blocked, harmless ones included (seen in every test run:
-`TP=4 FN=0 FP=5 TN=1`, FPR 0.83), with `errors=0`: these are verdicts, not failures. In the second
+Expected result: nearly every prompt is blocked, harmless ones included (seen in testing:
+`TP=4 FN=0 FP=5 TN=1`, FPR 0.83, in three runs and `TP=4 FN=0 FP=6 TN=0`, FPR 1.00, in a fourth),
+with `errors=0`: these are verdicts, not failures. In the second
 cell, look for a `blocked` line whose answer says the message *should not be blocked*: the judge
 was right, and the verdict wrong (seen in testing: all five still `blocked`, each answer ending
 `Answer: No`). A prompt may also come back `allowed` on the second try, with an answer that begins
@@ -139,6 +146,9 @@ The judge answers in sentences, worded differently each time. NeMo's parser look
 nothing warned you: only the evaluation exposed it.
 
 == Exercise 3: Fix the output contract
+
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m5-ex3.mp4[width=100%]
 
 Tell the judge exactly how to answer. The operator records a hash of the configuration in the
 guardrails Deployment and rolls the server when it changes; the block waits for that rollout.
@@ -181,6 +191,9 @@ good as the fine-tuned model on this set. An LLM judge is only as good as the co
 prompt and the code that reads it.
 
 == Exercise 4: Change the policy, and measure the trade
+
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m5-ex4.mp4[width=100%]
 
 Unlike Nemotron Safety Guard in Module 4, this judge's policy is yours to edit. Add two lines aimed
 at its two false positives, as a second configuration, `self-check-edited`, so that the original

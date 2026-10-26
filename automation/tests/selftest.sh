@@ -144,4 +144,14 @@ grep -q '^FAIL: cannot tell whether Secret maas-judge exists' <<<"$out" && ! gre
   fail "verify.sh must fail, not skip, when it cannot look up the judge key"
 rm -rf "$stub"
 
+# Every embedded step video exists, and none is longer than two minutes (when ffprobe is available).
+for v in $(grep -rhoE '^video::[^[]+' content/modules/ROOT/pages | sed 's/^video:://'); do
+  f=content/modules/ROOT/assets/images/$v
+  [[ -f $f ]] || fail "guide embeds $v, but $f is missing"
+  if command -v ffprobe >/dev/null; then
+    d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$f")
+    awk -v d="$d" 'BEGIN { exit !(d <= 121) }' || fail "$v is $d s long (at most two minutes)"
+  fi
+done
+
 echo "selftest: OK"

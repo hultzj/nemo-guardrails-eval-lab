@@ -51,6 +51,9 @@ records the verdict, and streams it to a web page together with the guardrails p
 
 == Exercise 1: Write the regex-only rail configuration
 
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m1-ex1.mp4[width=100%]
+
 The configuration is a ConfigMap with two files: `config.yaml` (which rails, with which
 settings) and `rails.co` (Colang flows, NeMo's flow language). This lab uses only built-in
 flows, but the server refuses to start without a `rails.co`, so it holds a comment.
@@ -91,6 +94,9 @@ yet; this is data.
 
 == Exercise 2: Create the guardrails server
 
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m1-ex2.mp4[width=100%]
+
 The resource names the configuration and turns authentication on. The operator does the rest.
 
 [source,bash,role="execute"]
@@ -126,6 +132,9 @@ the Deployment, even while the pod crash-loops (for example when a configuration
 ====
 
 == Exercise 3: Prove only you can call it
+
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m1-ex3.mp4[width=100%]
 
 Call the server's configuration list three times: with no token, with your workbench's token
 (`oc whoami -t` prints it), and with that token against the facilitator's tenant,
@@ -164,6 +173,9 @@ In short: authentication was a creation-time decision. The operator gets it righ
 annotation is there from the start.
 
 == Exercise 4: Watch your first verdicts live
+
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m1-ex4.mp4[width=100%]
 
 Open the live monitor, then send six prompts through it. Each request asks for the *input
 rails' verdict only* (`rails: {input: true, output: false, dialog: false}`): blocked prompts get a

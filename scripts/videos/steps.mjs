@@ -116,13 +116,18 @@ export const STEPS = {
   "lab-open-workbench": async (take, cfg) => {
     const p = await take.page("dash");
     take.cut();
+    // the dashboard's first-visit tour: marked seen before the page loads, so it never opens on camera
+    await p.addInitScript(() => { try { localStorage.setItem("odh-whats-new-3.5-seen", "true"); } catch { /* other origins */ } });
     await p.goto(cfg.dashboard);
     await p.locator("nav a", { hasText: /^Projects$/ }).first().waitFor({ timeout: 60000 });
     // The first-visit tour modal can open at any moment: dismiss it whenever it covers what we click.
     await p.addLocatorHandler(p.getByRole("dialog", { name: /Welcome to OpenShift AI/ }),
       async () => p.keyboard.press("Escape"));
+    // the tour modal opens once the dashboard has loaded its projects: wait for both, off camera
+    await p.locator("a", { hasText: new RegExp(`^${cfg.user}: guardrails lab$`) }).first().waitFor({ timeout: 60000 });
     const welcome = p.getByRole("dialog", { name: /Welcome to OpenShift AI/ });
-    if (await welcome.isVisible({ timeout: 10000 }).catch(() => false)) { await p.keyboard.press("Escape"); await sleep(800); }
+    if (await welcome.isVisible({ timeout: 5000 }).catch(() => false)) { await p.keyboard.press("Escape"); await sleep(1000); }
+    if (await welcome.isVisible().catch(() => false)) throw new Error("the welcome modal did not close");
     await intro(take, "Prerequisites · Open your workbench",
       "Log in to the OpenShift AI dashboard with <b>keycloak</b> (done before recording: no password appears in these videos), then open your project's workbench.");
     await take.box("dash", { sel: "nav a", re: "^Projects$" }, "1. Projects");
@@ -148,6 +153,8 @@ export const STEPS = {
     take.cut();  // JupyterLab loading
     await lab.locator("#jp-main-dock-panel").waitFor({ timeout: 120000 });
     await sleep(2500);
+    if (await lab.locator("#jp-left-stack.lm-mod-hidden").count()) await lab.keyboard.press("ControlOrMeta+b");  // a fresh JupyterLab shows its files
+    await sleep(800);
     take.normal();
     take.cam("lab");
     await show(take, [{ sel: "#filebrowser, .jp-FileBrowser", re: "", label: "JupyterLab: your files", kind: "info", hold: 2500 }]);
@@ -166,7 +173,7 @@ export const STEPS = {
     await L.openTerminal(take, lab);
     await L.runBlock(take, lab, L.block(cfg.www, "02-details", "git fetch -q --depth 1"), { why: "fetching the lab files" });
     await show(take, [
-      { term: "lab files at", label: "Lab files fetched at the deployed revision", kind: "info" },
+      { term: "^lab files at ", label: "Lab files fetched at the deployed revision", kind: "info" },
       { term: "^system:serviceaccount:", label: "Commands run as the workbench's identity", kind: "info" },
       { term: OUTPUTS.preflightAllowed, all: true, count: 3, label: "Allowed: what the exercises need", kind: "ok" },
       { term: OUTPUTS.preflightRefused, all: true, count: 2, label: "Refused: Secrets, other tenants", hold: 3000 },
@@ -363,7 +370,7 @@ export const STEPS = {
     text: "Point <code>tuned</code> at a safety endpoint that does not exist; the operator rolls the server by itself.",
     monitor: true, why: "the operator to roll the server",
     hl: [
-      { term: "safety-guard-missing", label: "base_url now points nowhere", kind: "info" },
+      { term: "base_url: .*safety-guard-missing", label: "base_url now points nowhere", kind: "info" },
       { term: "\"config\":\"tuned\".*ERROR", last: true, label: "tuned: no verdict at all", hold: 2400 },
       { term: "\"config\":\"content-safety\".*BLOCKED", last: true, label: "content-safety: still blocks", kind: "ok", hold: 2400 },
       { cam: "mon", sel: "#log", re: "Connection error", label: "The pod log names the cause", hold: 3200 },
@@ -417,7 +424,7 @@ export const STEPS = {
       "Run <b>2. After Exercise 1</b>: ten prompts, then each blocked harmless prompt with the judge's own answer.");
     await L.runSection(take, lab, "2. After Exercise 1", { why: "the judge (~6 s per prompt)" });
     await show(take, [
-      { sel: ".jp-OutputArea-output", re: "TP=4 FN=0 FP=5 TN=1", last: true, label: "Harmless prompts blocked: FPR 0.83", hold: 2800 },
+      { sel: ".jp-OutputArea-output", re: "TP=4 FN=0 FP=[56] TN=[01] errors=0", last: true, label: "Harmless prompts blocked: FPR 0.83 or more", hold: 2800 },
       { sel: ".jp-OutputArea-output", re: ROWS.judgeMisread, last: true, label: "blocked, yet the judge said: should NOT be blocked", hold: 3500 },
     ]);
     await outcome(take, "The judge was right; the verdict was wrong. NeMo reads only the first two words of its answer.");
@@ -429,7 +436,7 @@ export const STEPS = {
       "Tell the judge to answer in exactly one word, wait for the server to roll, and try two prompts.");
     await L.runBlock(take, lab, L.block(cfg.www, M5, "Reply with exactly one word"), { why: "the operator to roll the server" });
     await show(take, [
-      { term: "Reply with exactly one word", label: "The new output contract", kind: "info" },
+      { term: "^\\s+Reply with exactly one word", label: "The new output contract", kind: "info" },
       { term: "\"verdict\":\"allowed\"", last: true, label: "Betty White: allowed", kind: "ok" },
       { term: "\"verdict\":\"BLOCKED\"", last: true, label: "Rob a house: BLOCKED", hold: 2200 },
     ]);
@@ -450,7 +457,7 @@ export const STEPS = {
       "Add two policy lines as <code>self-check-edited</code>; the original policy stays live for comparison.");
     await L.runBlock(take, lab, L.block(cfg.www, M5, "self-check-edited"), { why: "the operator to roll the server" });
     await show(take, [
-      { term: "naming a kind of personal data|creative, theatrical", all: true, label: "Two new policy lines", kind: "info" },
+      { term: "^\\s+- (naming a kind of personal data|creative, theatrical)", all: true, count: 2, label: "Two new policy lines", kind: "info" },
       { term: "self-check-edited\"\\}\\]", last: true, label: "Both policies live", kind: "ok" },
     ]);
     await notebook(take, lab, cfg, "05-llm-judge.ipynb");

@@ -47,6 +47,9 @@ listed ConfigMap later rolls the server by itself.
 
 == Exercise 1: Write the content-safety configuration
 
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m2-ex1.mp4[width=100%]
+
 This configuration keeps the SSN, card-number and Presidio rails from Module 1, drops the
 keyword patterns (the model is meant to replace them), and adds the safety model with the
 prompt published for Nemotron Safety Guard v3.
@@ -136,6 +139,9 @@ Expected result: `configmap/content-safety created`.
 
 == Exercise 2: Serve both configurations from one server
 
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m2-ex2.mp4[width=100%]
+
 Replace the configuration list so the server mounts both, with `content-safety` as the default.
 
 [source,bash,role="execute"]
@@ -158,6 +164,9 @@ first), and the last line is `[{"id":"regex-only"},{"id":"content-safety"}]`. Th
 pane switches to the new pod (`--- following pod nemoguardrails-...`).
 
 == Exercise 3: Same prompts, two configurations
+
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m2-ex3.mp4[width=100%]
 
 Define `ask` again if you opened a new terminal tab (the block is in
 xref:03-module-01-guarded-endpoint.adoc#_exercise_4_watch_your_first_verdicts_live[Module 1, Exercise 4]),
@@ -201,6 +210,9 @@ In short: the model fixed both of Module 1's errors, and the regex rail in front
 saves a model call for the cases patterns handle well.
 
 == Exercise 4: Look at what the model actually said
+
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m2-ex4.mp4[width=100%]
 
 The verdict is NeMo's reading of the model's answer. Ask for the raw exchange once, straight
 from the guardrails server, to see the prompt NeMo sent and the JSON the model returned.

@@ -50,6 +50,9 @@ not exist. The shared model keeps serving everyone else.
 
 == Exercise 1: Narrow the policy, then measure
 
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m4-ex1.mp4[width=100%]
+
 The terminal steps use the `ask` helper from
 xref:03-module-01-guarded-endpoint.adoc#_exercise_4_watch_your_first_verdicts_live[Module 1, Exercise 4];
 in a new terminal tab, run that block first. In JupyterLab, also open
@@ -100,6 +103,9 @@ verdicts actually moved.
 
 == Exercise 2: Break the safety model connection
 
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m4-ex2.mp4[width=100%]
+
 Point `tuned` at a safety endpoint that does not exist. The operator sees the ConfigMap change
 and rolls the server by itself.
 
@@ -127,6 +133,9 @@ GUI view: the pod log pane is the fastest diagnosis in this lab; the verdict alo
 that no decision was made.
 
 == Exercise 3: Measure fail open versus fail closed
+
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m4-ex3.mp4[width=100%]
 
 In the notebook, run the cells under *3. After Exercise 2*: the same ten prompts (every fifth
 prompt of the set: four unsafe, six safe) against the broken configuration, once as each kind of
@@ -161,6 +170,9 @@ closed was decided by the client code, and the default, acting only on explicit 
 open.
 
 == Exercise 4: Restore the connection
+
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m4-ex4.mp4[width=100%]
 
 [source,bash,role="execute"]
 ----

@@ -3,6 +3,9 @@
 
 == Remove what you created
 
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::cleanup.mp4[width=100%]
+
 You created a `NemoGuardrails` resource and five rail ConfigMaps. Look at them first, then
 delete them, from your workbench terminal. The workbench, its files (the cloned lab and your
 notebook results), the live monitor and your project belong to the lab and stay.

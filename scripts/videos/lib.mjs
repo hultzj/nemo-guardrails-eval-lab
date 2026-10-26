@@ -60,11 +60,17 @@ const OVERLAY = () => {
     if (!term) return { rows: [], cw: 9 };
     const m = term.querySelector(".xterm-char-measure-element");
     const cw = m && m.textContent.length ? m.getBoundingClientRect().width / m.textContent.length : 9;
-    return { rows: [...term.querySelectorAll(".xterm-accessibility-tree > div")], cw };
+    const rows = [...term.querySelectorAll(".xterm-accessibility-tree > div")];
+    // Row i of the screen-reader tree is row i of the drawn screen: place boxes by the screen's own
+    // geometry (the tree's divs sit about half a row off the drawn text).
+    const sc = term.querySelector(".xterm-screen")?.getBoundingClientRect();
+    const at = (i, b) => (sc && rows.length ? { left: sc.left, top: sc.top + (i * sc.height) / rows.length,
+      bottom: sc.top + ((i + 1) * sc.height) / rows.length, width: sc.width } : { left: b.left, top: b.top, bottom: b.bottom, width: b.width });
+    return { rows, cw, at };
   };
   // Rows whose text matches re, merged into one rect per run of adjacent rows.
   const termRects = (re) => {
-    const { rows, cw } = termRows();
+    const { rows, cw, at } = termRows();
     const out = [];
     out.matched = 0;  // matching rows (adjacent ones share a rect)
     let cur = null, last = -2;
@@ -72,7 +78,7 @@ const OVERLAY = () => {
       const text = r.textContent.replace(/\s+$/, "");
       if (!new RegExp(re, "i").test(text)) return;
       out.matched++;
-      const b = r.getBoundingClientRect();
+      const b = at(i, r.getBoundingClientRect());
       const right = b.left + Math.min(b.width, text.length * cw + 8);
       if (cur && i === last + 1) { cur.bottom = b.bottom; cur.right = Math.max(cur.right, right); }
       else { cur = { left: b.left, top: b.top, right, bottom: b.bottom }; out.push(cur); }
@@ -90,7 +96,10 @@ const OVERLAY = () => {
     },
     title(text) { root().querySelectorAll(".title").forEach((c) => c.remove()); if (text) root().appendChild(el("title", esc(text))); },
     badge(text) { root().querySelectorAll(".badge").forEach((c) => c.remove()); if (text) root().appendChild(el("badge", esc(text))); },
-    clearBoxes() { root().querySelectorAll(".box").forEach((c) => c.remove()); },
+    clearBoxes() {
+      root().querySelectorAll(".box").forEach((c) => c.remove());
+      root().querySelectorAll(".cap").forEach((c) => { c.style.opacity = ""; });  // nothing left to make room for
+    },
     // target: {term: regex} | {sel, re} ; returns how many boxes were drawn
     box(target, label = "", kind = "", pad = 4) {
       let pick, matched;
@@ -112,6 +121,12 @@ const OVERLAY = () => {
         Object.assign(d.style, { left: `${b.left - pad}px`, top: `${b.top - pad}px`, width: `${b.right - b.left + 2 * pad}px`,
           height: `${b.bottom - b.top + 2 * pad}px` });
         root().appendChild(d);
+        // a caption over the highlighted output fades out of the way
+        const r = d.getBoundingClientRect();
+        root().querySelectorAll(".cap").forEach((c) => {
+          const k = c.getBoundingClientRect();
+          if (r.bottom > k.top && r.top < k.bottom && r.right > k.left && r.left < k.right) c.style.opacity = "0.12";
+        });
       });
       return matched ?? pick.length;  // terminal: rows matched, not boxes drawn
     },

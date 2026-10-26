@@ -43,6 +43,9 @@ itself from the verdicts it receives; the two tallies are independent and must a
 
 == Exercise 1: Open the notebook and look at the dataset
 
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m3-ex1.mp4[width=100%]
+
 . In JupyterLab's file browser open `nemo-guardrails-eval-lab`, then `notebooks`, then `03-evaluate.ipynb`.
 . Run the cells under *1. Setup and the dataset* (select a cell and press *Shift+Enter*).
 
@@ -54,6 +57,9 @@ server answers ...` or `... but not ['content-safety']`, run Modules 1 and 2 fir
 and both configurations every prompt gets no verdict, and an evaluation would measure nothing.
 
 == Exercise 2: Evaluate the regex-only configuration
+
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m3-ex2.mp4[width=100%]
 
 Keep the monitor page in view, then run the cell under *2. Evaluate `regex-only`*. It prints one
 character per prompt (`.` right, `x` wrong, `!` no verdict) while the monitor's run panel fills in.
@@ -73,6 +79,9 @@ unsafe prompts, and it refused four legitimate users. Hand-picked examples flatt
 
 == Exercise 3: Evaluate the content-safety configuration
 
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m3-ex3.mp4[width=100%]
+
 Run the cell under *3. Evaluate `content-safety`*.
 
 Expected result: after two to four minutes (about 3 to 4 seconds per prompt that reaches the
@@ -88,6 +97,9 @@ GUI view: the monitor's run history now lists both runs side by side; the *Decis
 shows the categories the model gave for each block.
 
 == Exercise 4: Compare, inspect, and cross-check
+
+.Video: this step on the lab cluster (waits sped up, no credentials shown)
+video::m3-ex4.mp4[width=100%]
 
 Run the remaining cells: *4. Compare*, *5. What each configuration got wrong*, and *6.
 Cross-check against the monitor*.

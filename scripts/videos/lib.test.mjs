@@ -207,16 +207,30 @@ test("highlights find real terminal rows and notebook outputs, and refuse what i
     const rows = ["get pods/log: yes", "get secrets: no", "create in peer-demo-guardrails: no", "configmap/regex-only created"];
     await page.setContent(`<div class="jp-Terminal" style="font: 16px monospace">
       <span class="xterm-char-measure-element">WWWWWWWWWW</span>
+      <div class="xterm-screen" style="position:absolute; top:100px; height:80px; width:600px"></div>
       <div class="xterm-accessibility-tree">${rows.map((r) => `<div style="height:18px">${r}</div>`).join("")}</div></div>
       <div class="jp-OutputArea-output">TP=20 FN=0 FP=3 TN=27 errors=0</div>`);
     const hl = (h) => show(take, [{ hold: 0, label: "x", ...h }]);
     await hl({ term: "^configmap/regex-only created$" });
     assert.equal(await page.locator("#__rec .box").count(), 1);
+    // row 3 of 4 on an 80 px screen at y=100 is y 160-180; the box adds 4 px padding and a 3 px border
+    const box = await page.locator("#__rec .box").boundingBox();
+    assert.deepEqual([Math.round(box.y), Math.round(box.height)], [156, 34]);
     await hl({ term: OUTPUTS.preflightRefused, all: true, count: 2 });
     await hl({ sel: ".jp-OutputArea-output", re: "TP=20 FN=0 FP=3 TN=27" });
     await assert.rejects(hl({ term: "^get secrets: yes$" }), /not found/);                   // the opposite answer
     await assert.rejects(hl({ sel: ".jp-OutputArea-output", re: "TP=20 FN=0 FP=2" }), /not found/);
     await assert.rejects(hl({ term: OUTPUTS.preflightRefused, all: true, count: 3 }), /expected 3/);
+    // a caption over a highlighted output fades, and comes back once that box is cleared
+    await page.evaluate(() => document.body.insertAdjacentHTML("beforeend",
+      '<div class="jp-OutputArea-output" style="position:absolute; left:30px; top:530px; width:300px">under the caption</div>'));
+    await take.caption("This step", "a caption at the bottom left");
+    const opacity = () => page.evaluate(() => document.querySelector("#__rec .cap").style.opacity);
+    await hl({ sel: ".jp-OutputArea-output", re: "under the caption" });
+    assert.equal(await opacity(), "0.12");
+    await take.clearBoxes();
+    await hl({ term: "^get pods/log: yes$" });
+    assert.equal(await opacity(), "");
     await page.evaluate(() => { document.querySelector(".jp-Terminal").style.display = "none"; });
     await assert.rejects(hl({ term: "^configmap/regex-only created$" }), /not found/);      // not on screen
   } finally { await browser.close(); }
