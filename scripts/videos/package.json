@@ -1,0 +1,9 @@
+{
+  "name": "nemo-guardrails-eval-lab-videos",
+  "private": true,
+  "description": "Records the lab's step videos (see README.md); not part of the Showroom build",
+  "type": "module",
+  "dependencies": {
+    "playwright": "1.64.0"
+  }
+}

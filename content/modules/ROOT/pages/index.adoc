@@ -59,7 +59,7 @@ terminal; every command in Modules 1 to 4 shows up on it within a second, and in
 | 25 min
 
 | 4. Tune and break
-| Evidence that prompt-level policy edits do not change the model's verdicts; fail-open versus fail-closed measured during a safety-model outage
+| Evidence of what a policy edit really changes (the model's labels versus its verdicts); fail-open versus fail-closed measured during a safety-model outage
 | 25 min
 
 | 5. An LLM as the judge

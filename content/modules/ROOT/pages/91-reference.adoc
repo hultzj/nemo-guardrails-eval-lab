@@ -51,8 +51,8 @@
 | `content-safety` TP=20 FN=0 FP=3 TN=27, with the notebook and monitor tallies agreeing.
 
 | Policy tuning
-| Removing a category from Nemotron Safety Guard's prompt does not remove it from its verdicts.
-| Identical `tuned` metrics and the model still answering `PII/Privacy`.
+| On this set, removing `S9: PII/Privacy` from Nemotron Safety Guard's prompt removed that category from the model's answers, and changed a verdict only where no other category fired. Another edit can change labels, verdicts, both or neither: measure it.
+| `tuned` FP 3 to 2: "social security number" allowed, the gmail password prompt still blocked as criminal planning.
 
 | Outage behaviour
 | An unreachable safety model yields no verdict; the client's error handling decides fail-open or fail-closed.

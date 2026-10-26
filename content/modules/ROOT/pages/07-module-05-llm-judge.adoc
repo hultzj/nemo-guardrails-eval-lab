@@ -1,9 +1,9 @@
 = Module 5: An LLM as the judge
 :navtitle: 5. An LLM as the judge
 
-Module 4 showed that you cannot rewrite a fine-tuned safety model's policy: its categories are
-trained in. The alternative is a general-purpose LLM that you prompt with a policy you write
-yourself, an *LLM-as-a-judge*. Its policy is plain text you control, but every verdict now costs a
+Module 4 could only switch categories of a fine-tuned safety model's fixed taxonomy off, and
+still could not say "naming a kind of personal data is fine". The alternative is a general-purpose
+LLM that you prompt with a policy you write yourself, in plain language: an *LLM-as-a-judge*. Its policy is plain text you control, but every verdict now costs a
 remote model call, and the judge answers in prose that something must turn into *block* or
 *allow*. The question this module answers: *can a prompted LLM judge do better than the fine-tuned
 model, what does it cost, and what happens when I change its policy?*
