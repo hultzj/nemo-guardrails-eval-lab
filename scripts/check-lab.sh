@@ -84,11 +84,12 @@ if [[ ! -d www ]]; then
 else
   names=$(awk '/^  attributes:/ {a = 1; next} a && /^    [A-Za-z0-9_-]+:/ {sub(/^ +/, ""); sub(/:.*/, ""); print}' \
     content/antora.yml | paste -sd'|' -)
-  if [[ -n "$names" ]] && grep -rnoE "\{($names)\}" www --include='*.html' >&2; then
+  # _attachments/ holds generated diagrams (their own JavaScript), not pages built from the guide
+  if [[ -n "$names" ]] && grep -rnoE "\{($names)\}" www --include='*.html' --exclude-dir=_attachments >&2; then
     fail "attributes rendered literally; add subs=\"attributes+\" to those blocks"
   fi
   # Asciidoctor strips a backslash only before {word}; anywhere else it reaches the participant.
-  if grep -rnoF '\{' www --include='*.html' >&2; then
+  if grep -rnoF '\{' www --include='*.html' --exclude-dir=_attachments >&2; then
     fail "a backslash before a brace survived into the HTML; escape only {word} forms"
   fi
 fi

@@ -1,0 +1,237 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Deterministic rails: regex and Presidio inside NeMo Guardrails",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Workbench",
+      "sublabel": "your token",
+      "pos": [
+        40,
+        320
+      ],
+      "size": [
+        130,
+        64
+      ]
+    },
+    {
+      "id": "monitor",
+      "type": "backend",
+      "label": "rails-monitor",
+      "sublabel": "oauth-proxy checks you",
+      "pos": [
+        300,
+        320
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "rbac",
+      "type": "security",
+      "label": "kube-rbac-proxy",
+      "sublabel": "may get services?",
+      "pos": [
+        560,
+        320
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "nemo",
+      "type": "backend",
+      "label": "NeMo Guardrails",
+      "sublabel": "config regex-only",
+      "pos": [
+        820,
+        320
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "tag": "input rails only"
+    },
+    {
+      "id": "regex",
+      "type": "security",
+      "label": "regex check input",
+      "sublabel": "SSN \u00b7 card \u00b7 keywords",
+      "pos": [
+        700,
+        540
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "presidio",
+      "type": "security",
+      "label": "detect sensitive data",
+      "sublabel": "Presidio entities",
+      "pos": [
+        930,
+        540
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "config",
+      "type": "database",
+      "label": "ConfigMap regex-only",
+      "sublabel": "config.yaml \u00b7 rails.co",
+      "pos": [
+        820,
+        100
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "operator",
+      "type": "cloud",
+      "label": "TrustyAI operator",
+      "sublabel": "NemoGuardrails CR",
+      "pos": [
+        1080,
+        100
+      ],
+      "size": [
+        150,
+        64
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "OpenShift AI cluster",
+      "wraps": [
+        "client",
+        "monitor",
+        "rbac",
+        "nemo",
+        "regex",
+        "presidio",
+        "config",
+        "operator"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "Your project: <user>-guardrails",
+      "wraps": [
+        "client",
+        "monitor",
+        "rbac",
+        "nemo",
+        "regex",
+        "presidio",
+        "config"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "ask",
+      "from": "client",
+      "to": "monitor",
+      "label": "prompt",
+      "variant": "emphasis"
+    },
+    {
+      "id": "forward",
+      "from": "monitor",
+      "to": "rbac",
+      "label": "monitor's token",
+      "variant": "emphasis"
+    },
+    {
+      "id": "authorize",
+      "from": "rbac",
+      "to": "nemo",
+      "label": "allowed",
+      "variant": "security"
+    },
+    {
+      "id": "run-regex",
+      "from": "nemo",
+      "to": "regex",
+      "label": "pattern match",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "run-presidio",
+      "from": "nemo",
+      "to": "presidio",
+      "label": "NER",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "load-config",
+      "from": "config",
+      "to": "nemo",
+      "label": "mounted",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    },
+    {
+      "id": "deploy",
+      "from": "operator",
+      "to": "nemo",
+      "label": "deploys",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "right"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "How a verdict is made",
+      "items": [
+        "Every rail runs inside the server pod",
+        "First match blocks; no match allows",
+        "Milliseconds, the same answer every time"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Control boundaries",
+      "items": [
+        "kube-rbac-proxy admits only your project's callers",
+        "Patterns see words, not meaning"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Lab modules",
+      "items": [
+        "Module 1 builds it",
+        "Module 3 measures it: recall 0.00"
+      ]
+    }
+  ]
+}

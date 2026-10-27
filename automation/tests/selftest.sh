@@ -144,6 +144,24 @@ grep -q '^FAIL: cannot tell whether Secret maas-judge exists' <<<"$out" && ! gre
   fail "verify.sh must fail, not skip, when it cannot look up the judge key"
 rm -rf "$stub"
 
+# The architecture diagrams draw the deployment as built: the workbench, monitor, proxy, server and
+# their rails run in the participant's project (tenants.yaml), the judge key only in the lab namespace.
+python3 - <<'PYDIAG' || fail "an architecture diagram misplaces a component's namespace"
+import json, sys
+want = {"guardrails-deterministic": {"Your project: <user>-guardrails": {"client", "monitor", "rbac", "nemo", "regex", "presidio", "config"}},
+        "guardrails-llm-judge": {"Your project: <user>-guardrails": {"client", "monitor", "rbac", "nemo", "config", "rail"},
+                                 "guardrails-lab-shared: lab only": {"proxy", "secret"}}}
+for name, bounds in want.items():
+    d = json.load(open(f"diagrams/{name}.architecture.json"))
+    got = {b["label"]: set(b["wraps"]) for b in d["boundaries"]}
+    for label, members in bounds.items():
+        if got.get(label) != members: sys.exit(f"{name}: {label} wraps {sorted(got.get(label, []))}, expected {sorted(members)}")
+PYDIAG
+# ... and the page says who checks which token: oauth-proxy yours, kube-rbac-proxy the monitor's.
+grep -q "oauth-proxy admits only" content/modules/ROOT/pages/01-overview.adoc &&
+  grep -q "its own service-account token, which kube-rbac-proxy checks" content/modules/ROOT/pages/01-overview.adoc ||
+  fail "the overview no longer says which proxy checks which token"
+
 # Every embedded step video exists, and none is longer than two minutes (when ffprobe is available).
 for v in $(grep -rhoE '^video::[^[]+' content/modules/ROOT/pages | sed 's/^video:://'); do
   f=content/modules/ROOT/assets/images/$v

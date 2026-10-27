@@ -62,6 +62,38 @@ costs one model call per request (seconds on CPU), and its mistakes are statisti
 cannot read them off the configuration, you can only measure them. That is why this lab
 evaluates.
 
+== How a request flows on OpenShift
+
+Both kinds of configuration share the same front half, and every piece of it runs in your
+project. Your workbench sends the prompt to the live monitor, whose oauth-proxy admits only
+callers that may `get services` there; the monitor records the verdict and calls the guardrails
+server with its own service-account token, which kube-rbac-proxy checks the same way. (Call the
+server directly, as in Module 1, Exercise 3, and kube-rbac-proxy checks yours.) What differs is
+where the decision is made.
+
+=== Deterministic rails: everything inside the server
+
+image::guardrails-deterministic.png["Deterministic rails: the workbench calls rails-monitor, then kube-rbac-proxy, then the NeMo Guardrails server, which runs the regex and Presidio rails from the regex-only ConfigMap inside its own pod",width=100%,xref=attachment$guardrails-deterministic.html,window=_blank]
+
+The `regex-only` configuration (Modules 1 to 4) never leaves the server pod. The regex rail and
+Presidio's entity detection run in process; the first match blocks, and no match allows. A
+verdict takes milliseconds and is the same every time. The TrustyAI operator deploys the server
+from your `NemoGuardrails` resource and mounts your ConfigMap; neither sits in the request path.
+xref:attachment$guardrails-deterministic.html[Open the interactive diagram,window=_blank] (zoom, focus, dark mode).
+
+=== LLM as the judge: the decision leaves the cluster
+
+image::guardrails-llm-judge.png["LLM as the judge: the NeMo Guardrails server's self check input rail sends the policy prompt and message, with no key, to the judge-proxy in guardrails-lab-shared, which adds the key from Secret maas-judge and calls the Model-as-a-Service endpoint",width=100%,xref=attachment$guardrails-llm-judge.html,window=_blank]
+
+The `self-check` configuration (Module 5) sends your policy prompt and the message to a
+general-purpose LLM. Your server holds no key (`api_key: none`): it calls the lab's
+`judge-proxy` in `{lab_namespace}`, which alone reads Secret `maas-judge`, pins the model and
+forwards the call to the Model-as-a-Service endpoint. NeMo then reads the first two words of the
+judge's answer: *no* allows, anything else blocks. A verdict takes seconds and can differ from
+run to run. Because you write the configuration, you decide where your server sends requests;
+keeping the key in the lab namespace means a redirected call carries nothing worth stealing.
+xref:attachment$guardrails-llm-judge.html[Open the interactive diagram,window=_blank] (zoom, focus, dark mode).
+
 == Lab progression
 
 === 1. Stand up a guarded endpoint

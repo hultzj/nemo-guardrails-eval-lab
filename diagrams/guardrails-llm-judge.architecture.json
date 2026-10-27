@@ -1,0 +1,264 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "LLM as the judge: self check input through the judge proxy",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Workbench",
+      "sublabel": "your token",
+      "pos": [
+        60,
+        240
+      ],
+      "size": [
+        130,
+        64
+      ]
+    },
+    {
+      "id": "monitor",
+      "type": "backend",
+      "label": "rails-monitor",
+      "sublabel": "oauth-proxy checks you",
+      "pos": [
+        260,
+        240
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "rbac",
+      "type": "security",
+      "label": "kube-rbac-proxy",
+      "sublabel": "may get services?",
+      "pos": [
+        510,
+        240
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "nemo",
+      "type": "backend",
+      "label": "NeMo Guardrails",
+      "sublabel": "config self-check",
+      "pos": [
+        720,
+        240
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "tag": "api_key: none"
+    },
+    {
+      "id": "config",
+      "type": "database",
+      "label": "ConfigMap self-check",
+      "sublabel": "policy prompt",
+      "pos": [
+        720,
+        60
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "rail",
+      "type": "security",
+      "label": "self check input",
+      "sublabel": "first two words: yes/no",
+      "pos": [
+        720,
+        410
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "proxy",
+      "type": "security",
+      "label": "judge-proxy",
+      "sublabel": "adds key \u00b7 pins model",
+      "pos": [
+        960,
+        410
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "secret",
+      "type": "database",
+      "label": "Secret maas-judge",
+      "sublabel": "make judge-secret",
+      "pos": [
+        960,
+        560
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "maas",
+      "type": "external",
+      "label": "Model as a Service",
+      "sublabel": "deepseek-r1-distill-qwen-14b",
+      "pos": [
+        1170,
+        410
+      ],
+      "size": [
+        170,
+        64
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "OpenShift AI cluster",
+      "wraps": [
+        "client",
+        "monitor",
+        "rbac",
+        "nemo",
+        "config",
+        "rail",
+        "proxy",
+        "secret"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "Your project: <user>-guardrails",
+      "wraps": [
+        "client",
+        "monitor",
+        "rbac",
+        "nemo",
+        "config",
+        "rail"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "guardrails-lab-shared: lab only",
+      "wraps": [
+        "proxy",
+        "secret"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "ask",
+      "from": "client",
+      "to": "monitor",
+      "label": "prompt",
+      "variant": "emphasis"
+    },
+    {
+      "id": "forward",
+      "from": "monitor",
+      "to": "rbac",
+      "label": "monitor's token",
+      "variant": "emphasis"
+    },
+    {
+      "id": "authorize",
+      "from": "rbac",
+      "to": "nemo",
+      "label": "allowed",
+      "variant": "security"
+    },
+    {
+      "id": "load-config",
+      "from": "config",
+      "to": "nemo",
+      "label": "mounted",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    },
+    {
+      "id": "run-rail",
+      "from": "nemo",
+      "to": "rail",
+      "label": "policy + message",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    },
+    {
+      "id": "call-proxy",
+      "from": "rail",
+      "to": "proxy",
+      "label": "no key",
+      "variant": "emphasis"
+    },
+    {
+      "id": "read-key",
+      "from": "secret",
+      "to": "proxy",
+      "label": "mounted",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "call-maas",
+      "from": "proxy",
+      "to": "maas",
+      "label": "Bearer key",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "How a verdict is made",
+      "items": [
+        "The judge reads your policy prompt and answers",
+        "No in the first two words allows; anything else blocks",
+        "Seconds per prompt; can vary run to run"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Control boundaries",
+      "items": [
+        "The key exists only in the lab namespace",
+        "Your config can redirect a call, never steal a key"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Lab modules",
+      "items": [
+        "Module 5 builds and measures it"
+      ]
+    }
+  ]
+}
