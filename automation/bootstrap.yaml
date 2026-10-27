@@ -1,6 +1,7 @@
-# Parent Application for clusters without an RHDP order; `make bootstrap`
-# fills in the cluster's ingress domain and the git revision (REVISION, default: gitops.revision in values.yaml). On RHDP the Field Content CI creates
-# the equivalent itself.
+# Parent Application for clusters without an RHDP order; `make bootstrap` fills in the cluster's
+# ingress domain, the repository (REPO_URL, default: gitops.repoUrl in values.yaml, so a fork deploys
+# itself) and the git revision (REVISION, default: gitops.revision). On RHDP the Field Content CI
+# creates the equivalent itself.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -14,13 +15,14 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/hultzj/nemo-guardrails-eval-lab.git
+    repoURL: GIT_REPO_URL
     targetRevision: GIT_REVISION
     path: automation/argocd
     helm:
       valuesObject:
-        # The children and the Showroom guide follow the same revision as this parent.
+        # The children and the Showroom guide follow the same repository and revision as this parent.
         gitops:
+          repoUrl: GIT_REPO_URL
           revision: GIT_REVISION
         deployer:
           domain: DEPLOYER_DOMAIN

@@ -5,7 +5,9 @@ GITOPS_NS ?= openshift-gitops
 # The parent Application name, from bootstrap.yaml; every namespace this lab creates carries part-of=<LAB_APP>.
 LAB_APP := $(shell awk '/^metadata:/ {m = 1} m && $$1 == "name:" {print $$2; exit}' "$(AUTOMATION_DIR)/bootstrap.yaml" 2>/dev/null)
 # Defaults to the revision values.yaml names, so an event branch deploys itself.
-REVISION ?= $(shell awk '/^gitops:/ {g = 1} g && $$1 == "revision:" {print $$2; exit}' "$(AUTOMATION_DIR)/argocd/values.yaml" 2>/dev/null)
+REVISION ?= $(shell awk '/^gitops:/ {g = 1} g && $$1 == "revision:" {gsub(/["\047]/, "", $$2); print $$2; exit}' "$(AUTOMATION_DIR)/argocd/values.yaml" 2>/dev/null)
+# The repository the parent Application deploys from: gitops.repoUrl, so a fork deploys its own values.
+REPO_URL ?= $(shell awk '/^gitops:/ {g = 1} g && $$1 == "repoUrl:" {gsub(/["\047]/, "", $$2); print $$2; exit}' "$(AUTOMATION_DIR)/argocd/values.yaml" 2>/dev/null)
 
 .PHONY: help users bootstrap status verify teardown
 
@@ -25,6 +27,7 @@ help:
 bootstrap:
 	@set -euo pipefail; \
 	[[ "$(REVISION)" =~ ^[A-Za-z0-9._/-]+$$ ]] || { echo "REVISION '$(REVISION)' has unsafe characters" >&2; exit 1; }; \
+	[[ "$(REPO_URL)" =~ ^https://[A-Za-z0-9._/:-]+$$ ]] || { echo "REPO_URL '$(REPO_URL)' is not an https git URL" >&2; exit 1; }; \
 	domain=$$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}'); test -n "$$domain"; \
 	bash "$(AUTOMATION_DIR)/guard-namespaces.sh" "$(LAB_APP)" "$$domain"; \
 	apps=$$(helm template "$(LAB_APP)" "$(AUTOMATION_DIR)/argocd" --set deployer.domain="$$domain"); \
@@ -33,7 +36,7 @@ bootstrap:
 	  oc create namespace "$$sns" --dry-run=client -o yaml | oc apply -f -; \
 	  oc label namespace "$$sns" "argocd.argoproj.io/managed-by=$(GITOPS_NS)" "app.kubernetes.io/part-of=$(LAB_APP)" --overwrite; \
 	fi; \
-	sed "s|DEPLOYER_DOMAIN|$$domain|; s|GIT_REVISION|$(REVISION)|" "$(AUTOMATION_DIR)/bootstrap.yaml" | oc apply -f -
+	sed "s|DEPLOYER_DOMAIN|$$domain|; s|GIT_REVISION|$(REVISION)|; s|GIT_REPO_URL|$(REPO_URL)|" "$(AUTOMATION_DIR)/bootstrap.yaml" | oc apply -f -
 
 # Participants from lab.users, minus lab.presenters (existing accounts that must not be reset).
 users:

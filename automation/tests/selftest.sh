@@ -5,8 +5,34 @@ cd "$(dirname "$0")/../.."
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
 # An event-branch bootstrap must deploy the children and the guide from that branch, not main.
-grep -A1 '^        gitops:' automation/bootstrap.yaml | grep -q 'revision: GIT_REVISION' ||
+grep -A2 '^        gitops:' automation/bootstrap.yaml | grep -q 'revision: GIT_REVISION' ||
   fail "bootstrap.yaml does not pass gitops.revision to the children"
+# ... and deploys from the repository values.yaml names, so a fork deploys its own values.
+grep -q '^    repoURL: GIT_REPO_URL$' automation/bootstrap.yaml || fail "bootstrap.yaml hardcodes the repository instead of GIT_REPO_URL"
+want=$(awk '/^gitops:/ {g = 1} g && $1 == "repoUrl:" {print $2; exit}' automation/argocd/values.yaml)
+# a dry run prints the recipe with REPO_URL expanded (and runs nothing)
+recipe=$(make -n -C automation bootstrap 2>/dev/null)
+[[ -n $want && $recipe == *"s|GIT_REPO_URL|$want|"* ]] || fail "make bootstrap would not deploy from gitops.repoUrl '$want'"
+recipe=$(make -n -C automation bootstrap REPO_URL=https://github.com/someone/fork.git 2>/dev/null)
+[[ $recipe == *'s|GIT_REPO_URL|https://github.com/someone/fork.git|'* ]] || fail "REPO_URL does not override the repository"
+# the parent hands the repository to its children and Showroom, as it does the revision
+grep -A2 '^        gitops:' automation/bootstrap.yaml | grep -q 'repoUrl: GIT_REPO_URL' ||
+  fail "bootstrap.yaml does not pass gitops.repoUrl to the children"
+fork=$(helm template lab automation/argocd --set gitops.repoUrl=https://github.com/someone/fork.git --set deployer.domain=apps.example.com)
+[[ $(grep -cE 'repo(URL|Url): "?https://github.com/someone/fork.git' <<<"$fork") -ge 3 ]] &&
+  ! grep -q 'hultzj/nemo-guardrails-eval-lab' <<<"$fork" || fail "children or Showroom do not follow gitops.repoUrl"
+# YAML quotes around gitops.repoUrl/revision are not part of the value (on a copy: values.yaml stays untouched)
+q=$(mktemp -d); cp -R automation "$q/"
+sed -i.bak -E "s|^  repoUrl: (.*)$|  repoUrl: '\\1'|; s|^  revision: (.*)$|  revision: \"\\1\"|" "$q/automation/argocd/values.yaml"
+recipe=$(make -n -C "$q/automation" bootstrap 2>/dev/null)
+[[ $recipe == *"s|GIT_REPO_URL|$want|"* && $recipe == *"s|GIT_REVISION|$(awk '/^gitops:/ {g = 1} g && $1 == "revision:" {print $2; exit}' automation/argocd/values.yaml)|"* ]] ||
+  fail "make bootstrap keeps YAML quotes around gitops.repoUrl or revision"
+rm -rf "$q"
+# ... and refuses a repository URL that is not https, before touching the cluster (oc and helm stubbed to fail)
+stub=$(mktemp -d); printf '#!/usr/bin/env bash\necho "stub: must not run" >&2; exit 99\n' >"$stub/oc"; cp "$stub/oc" "$stub/helm"; chmod +x "$stub/oc" "$stub/helm"
+out=$(PATH="$stub:$PATH" KUBECONFIG=/dev/null make -s -C automation bootstrap REPO_URL='file:///etc' 2>&1 || true)
+[[ $out == *"is not an https git URL"* && $out != *"stub: must not run"* ]] || fail "make bootstrap accepted a non-https REPO_URL"
+rm -rf "$stub"
 rendered=$(helm template lab automation/argocd --set deployer.domain=apps.example.com --set gitops.revision=event-x)
 showroom_sha=$(sed -n '/^  chart:/,/path:/s/^    revision: //p' automation/argocd/values.yaml)
 grep -q 'repoRef: "event-x"' <<<"$rendered" || fail "Showroom content does not follow gitops.revision"

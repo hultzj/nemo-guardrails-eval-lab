@@ -25,8 +25,8 @@ This lab runs on one shared cluster: every participant, and the presenter, gets 
 | A default StorageClass (Showroom's PVC)
 | `oc get storageclass`
 
-| Egress to `huggingface.co` (the 4.9 GB model file, verified by sha256) and `ghcr.io` (llama.cpp image)
-| The `safety-guard` pods reach `Running`
+| Egress to `github.com` (this repository, the Showroom chart and theme, and the lab files each workbench fetches), `huggingface.co` (the 4.9 GB model file, verified by sha256), `ghcr.io` (llama.cpp image), `registry.access.redhat.com` (UBI Python: the monitor and the model download) and `quay.io` (oauth-proxy and Showroom images)
+| The Applications sync and every lab pod reaches `Running`
 
 | For Module 5: each participant's own API key for an OpenAI-compatible model endpoint (the workshop's Model-as-a-Service portal issues them), and egress from the cluster to that endpoint
 | Each participant enters theirs in Module 5; `make verify` checks the empty `judge-api-key` Secret is in every project
@@ -42,7 +42,8 @@ start, so the first rollout takes several minutes per node.
 
 == Provision
 
-From a cluster-admin shell in a checkout of this repository:
+From a cluster-admin shell in a checkout of this repository, with `oc`, `helm` (`make bootstrap`
+renders the chart), `make`, `bash`, `git`, `curl`, `python3` and `openssl` installed:
 
 . Set the user list in `automation/argocd/values.yaml` (`lab.users`; the default is
   `user1`..`user5` plus `presenter`, a regular account to present with). Present as a

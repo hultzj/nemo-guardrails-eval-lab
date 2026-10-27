@@ -32,6 +32,8 @@ jobs:
         run: |
           python3 -m unittest discover -s automation/tests
           bash automation/tests/selftest.sh
+      - name: recorder checks (its browser and ffmpeg tests skip where those are not installed)
+        run: node --test scripts/videos/lib.test.mjs
       - if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v4
         with:
