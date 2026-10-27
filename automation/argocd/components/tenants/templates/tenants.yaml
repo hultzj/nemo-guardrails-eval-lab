@@ -62,6 +62,13 @@ rules:
   - apiGroups: [kubeflow.org]
     resources: [notebooks]
     verbs: [get, list, watch, patch]
+  # Module 5: the participant's own judge API key goes into the one Secret the lab created for it.
+  # No create: a participant who could create Secrets could create a service-account-token one and
+  # be handed a token for a ServiceAccount in the project. A Secret's type cannot change later.
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames: [judge-api-key]
+    verbs: [get, update, patch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -242,16 +249,16 @@ data:
   repoUrl: {{ required "gitops.repoUrl is required" $.Values.gitops.repoUrl | quote }}
   revision: {{ required "gitops.revision is required" $.Values.gitops.revision | quote }}
 ---
-# Module 5's LLM judge: the shared judge proxy (it alone holds the API key, in the lab namespace;
-# a key in this namespace could be sent anywhere by a rail config the participant controls).
+# Module 5: where the participant puts their own judge API key (Argo CD ignores its data, so the
+# key they write stays). Empty until then; only this project's participant and server can read it.
 apiVersion: v1
-kind: ConfigMap
+kind: Secret
 metadata:
-  name: lab-judge
+  name: judge-api-key
   namespace: {{ $ns }}
+type: Opaque
 data:
-  baseUrl: {{ printf "http://judge-proxy.%s.svc:8080/v1" $.Values.lab.namespace | quote }}
-  model: {{ required "judge.model is required" $.Values.judge.model | quote }}
+  api-key: ""
 ---
 # The participant's workbench: JupyterLab (terminal + notebooks) in this Data Science Project. Its
 # ServiceAccount carries the participant's permissions (bindings above), so `oc` in its terminal and

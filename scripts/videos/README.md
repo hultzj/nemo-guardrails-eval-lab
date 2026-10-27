@@ -16,6 +16,8 @@ on the user's project, in guide order, so start from a fresh tenant (or run `cle
   password, the judge key, the Keycloak admin password, the kubeadmin password and the session
   cookies (all held in memory only), and against token-shaped strings. A match discards the video.
 * Commands never print tokens: `oc whoami -t` only ever appears inside `$(...)`.
+* Module 5's API key (read from `JUDGE_KEY_SECRET`) is typed into a `read -s` prompt, so it is
+  never on screen; it is also on the scan list.
 
 ## Record
 
@@ -26,6 +28,7 @@ cd scripts/videos && npm install && npx playwright install chromium
 npm --prefix ../.. run build                       # the recorder pastes commands from the built guide
 LAB_USER=user1 LAB_PASSWORD_FILE=<file> DOMAIN=apps.<cluster> node login.mjs <state.json>
 LAB_USER=user1 LAB_PASSWORD_FILE=<file> KUBEADMIN_PASSWORD_FILE=<file> DOMAIN=apps.<cluster> \
+  JUDGE_KEY_SECRET=<namespace>/<secret>/<key> \
   STATE=<state.json> node record.mjs all             # or one or more step names: node record.mjs list
 ```
 

@@ -8,7 +8,7 @@ remote model call, and the judge answers in prose that something must turn into 
 *allow*. The question this module answers: *can a prompted LLM judge do better than the fine-tuned
 model, what does it cost, and what happens when I change its policy?*
 
-In this module you wire a remote LLM in as a judge without its API key ever entering your project, find and fix a
+In this module you wire a remote LLM in as a judge with your own API URL, model and key, find and fix a
 silent failure in how its answers are read, compare all three judges, and measure what one policy
 edit really changes.
 
@@ -23,14 +23,13 @@ edit really changes.
 
 == Technical context
 
-The judge is the configuration's `main` model, an OpenAI-compatible endpoint (`engine: openai`).
-Your server does not call the Model-as-a-Service endpoint directly: it calls the lab's shared
-*judge proxy*, whose address and model the facilitator recorded in the `lab-judge` ConfigMap in
-your project. The proxy alone holds the API key, in the lab's own namespace, and adds it to every
-request it forwards. The key never enters your project, and that is deliberate: you write the rail
-configuration, so you decide where your server sends its requests. A key your server held could be
-sent to any address you chose. Your configuration carries a placeholder, `api_key: none`, because
-NeMo refuses an `openai` model without one.
+The judge is the configuration's `main` model, an OpenAI-compatible endpoint (`engine: openai`):
+the workshop's Model-as-a-Service (MaaS) endpoint or any other you have a key for. You bring three
+values: the API URL, the model name and your API key, as shown on the MaaS portal's example
+request. The URL and model go into the rail configuration. The key goes into the Secret
+`judge-api-key` that the lab created, empty, in your project: you and your guardrails server can
+read it, nobody else in the class can, and the `NemoGuardrails` resource maps it into the
+`OPENAI_API_KEY` environment variable that the configuration's `api_key_env_var` names.
 
 A request selects the main model with its `model` field. Every helper in this lab sends an empty
 `model`, which tells the server to use the configuration's own model; any other value would
@@ -43,7 +42,7 @@ message should be blocked. NeMo parses the answer with its `is_content_safe` par
 
 == Learning objectives
 
-* Attach a remote LLM to a guardrails configuration through a proxy that keeps its key out of your project.
+* Attach a remote LLM to a guardrails configuration with your own API key, kept in a Secret only your server reads.
 * Find a judge that is right but misread, by comparing its own words with the verdict.
 * Fix the output contract between a judge prompt and its parser, and measure the difference.
 * Compare a pattern rail, a fine-tuned safety model and a prompted LLM judge on accuracy and latency.
@@ -54,15 +53,48 @@ message should be blocked. NeMo parses the answer with its `is_content_safe` par
 .Video: this step on the lab cluster (waits sped up, no credentials shown)
 video::m5-ex1.mp4[width=100%]
 
-Write the `self-check` configuration with the judge proxy's address and model from `lab-judge`,
-and add it to your server. Nothing in your project holds the key.
+Enter your judge's API URL, model name and API key. The prompts suggest the workshop's MaaS
+endpoint and model; press Enter to accept them. The key is not shown as you type.
+
+[source,bash,role="execute"]
+----
+read -rp "API URL [https://maas-rhdp.apps.maas.redhatworkshops.io/v1]: " JUDGE_URL; read -rp "Model [openai/deepseek-r1-distill-qwen-14b]: " JUDGE_MODEL; read -rsp "API key (not shown): " JUDGE_KEY; echo
+----
+
+Expected result: three prompts, one after the other; nothing appears while you type the key, and
+the shell prompt returns.
+
+Try the three values straight against the endpoint (the portal's `Hello, world!` request), then
+store the key in your project. The key travels in a header file and on standard input, never on a
+command line, and the shell forgets it afterwards.
 
 [source,bash,role="execute"]
 ----
 NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
-JUDGE_URL=$(oc -n $NS get configmap lab-judge -o jsonpath='{.data.baseUrl}')
-JUDGE_MODEL=$(oc -n $NS get configmap lab-judge -o jsonpath='{.data.model}')
-echo "judge: $JUDGE_MODEL via $JUDGE_URL"
+JUDGE_URL=${JUDGE_URL:-https://maas-rhdp.apps.maas.redhatworkshops.io/v1}; JUDGE_URL=${JUDGE_URL%/}
+JUDGE_MODEL=${JUDGE_MODEL:-openai/deepseek-r1-distill-qwen-14b}
+echo "judge: $JUDGE_MODEL at $JUDGE_URL, key of ${#JUDGE_KEY} characters"
+jq -n --arg m "$JUDGE_MODEL" '{model: $m, max_tokens: 64, messages: [{role: "user", content: "Hello, world!"}]}' |
+  curl -s "$JUDGE_URL/chat/completions" -H @<(printf 'Authorization: Bearer %s\n' "$JUDGE_KEY") \
+    -H 'Content-Type: application/json' -d @- |
+  jq -c '{model, accepted: (.choices != null), error: (.error | if type == "object" then .message else . end)}'
+printf '%s' "$JUDGE_KEY" | oc -n $NS set data secret/judge-api-key --from-file=api-key=/dev/stdin
+unset JUDGE_KEY
+----
+
+Expected result: `judge: openai/deepseek-r1-distill-qwen-14b at
+https://maas-rhdp.apps.maas.redhatworkshops.io/v1, key of <n> characters`; the endpoint answers
+`{"model":"deepseek-r1-distill-qwen-14b","accepted":true,"error":null}` (the reasoning model may not
+finish a sentence within 64 tokens; an answer at all means your key and model were accepted); and
+`secret/judge-api-key data updated` (`info: judge-api-key was not changed` if that key was already
+stored). A wrong key or model shows the endpoint's error instead
+(for example `"accepted":false` with `Authentication Error`): fix it and run both blocks again.
+
+Now write the `self-check` configuration with your URL and model, add it to your server, and map
+the key into it.
+
+[source,bash,role="execute"]
+----
 oc -n $NS apply -f - <<EOF
 apiVersion: v1
 kind: ConfigMap
@@ -73,10 +105,10 @@ data:
     models:
       - type: main
         engine: openai
-        model: $JUDGE_MODEL
+        model: "$JUDGE_MODEL"
+        api_key_env_var: OPENAI_API_KEY
         parameters:
-          api_key: none
-          base_url: $JUDGE_URL
+          base_url: "$JUDGE_URL"
           temperature: 0
           max_tokens: 1024
     rails:
@@ -106,17 +138,19 @@ EOF
 oc -n $NS get nemoguardrails nemoguardrails -o jsonpath='{.spec.nemoConfigs[*].name}' | grep -qw self-check ||
   oc -n $NS patch nemoguardrails nemoguardrails --type json \
     -p '[{"op": "add", "path": "/spec/nemoConfigs/-", "value": {"name": "self-check", "configMaps": ["self-check"]}}]'
+oc -n $NS patch nemoguardrails nemoguardrails --type merge \
+  -p '{"spec": {"env": [{"name": "OPENAI_API_KEY", "valueFrom": {"secretKeyRef": {"name": "judge-api-key", "key": "api-key"}}}]}}'
 GR=https://$(oc -n $NS get route nemoguardrails -o jsonpath='{.spec.host}')
 for i in $(seq 1 60); do
   c=$(curl -sk -H "Authorization: Bearer $(oc whoami -t)" $GR/v1/rails/configs)
   case $c in *self-check*) break ;; esac; sleep 5
 done
+oc -n $NS rollout status deploy/nemoguardrails --timeout=300s
 echo "$c"
 ----
 
-Expected result: pass:c,a,q[`judge: openai/deepseek-r1-distill-qwen-14b via http://judge-proxy.{lab_namespace}.svc:8080/v1`];
-`configmap/self-check created`; `nemoguardrails patched`; and the last line lists `self-check` with
-your other configurations.
+Expected result: `configmap/self-check created`; two `nemoguardrails patched` lines (one on a
+re-run); the server rolls out; and the last line lists `self-check` with your other configurations.
 
 In JupyterLab open `nemo-guardrails-eval-lab/notebooks/05-llm-judge.ipynb` and run the cells under
 *1. Setup*.
@@ -249,7 +283,7 @@ prompts, and check the prompts that moved.
 
 Before continuing, verify that you can answer:
 
-* How does your guardrails server use the judge without its API key ever being in your project, and why does that matter?
+* Where does your API key live, who can read it, and how does your guardrails server get it?
 * Why did the first measurement block harmless prompts, and how did you show the judge itself was often right?
 * How did the prompted judge compare with the fine-tuned model on precision, recall, FPR and latency?
 * What did the policy edit change, and what does it take to tell its effect from the judge's noise?
@@ -257,7 +291,7 @@ Before continuing, verify that you can answer:
 .Answer key
 [%collapsible]
 ====
-* Your server calls the shared judge proxy, which alone holds the key and adds it to each request it forwards. You write the rail configuration, including the URL your server calls, so a key your server held could be redirected to any address you chose; the placeholder `api_key: none` is all your project carries.
+* In the Secret `judge-api-key` in your project. You and your server can read it, other participants cannot; the `NemoGuardrails` resource maps it into `OPENAI_API_KEY`, the variable `api_key_env_var` names. It never appeared on a command line or in the terminal: the shell read it without echo and passed it on standard input.
 * NeMo's parser reads only the first two words of the judge's answer. Answers that began with a sentence instead of *yes* or *no* defaulted to *block*; `lab.explain()` showed `blocked` verdicts next to answers saying the message should not be blocked.
 * On this set the judge scored precision about 0.9, recall 0.95 to 1.00 and FPR 0.07, against the fine-tuned model's 0.87, 1.00 and 0.10, at about three times the latency per prompt, through a remote, shared endpoint.
 * It moved a few prompts, different ones in different runs. Re-asking the moved prompts under both policies gives evidence: opposite counts point to the edit, similar counts to noise, and three tries are too few to be sure about any one prompt. A policy edit is a behaviour change: it needs repeated measurement before anyone claims it worked.

@@ -202,9 +202,10 @@ export function inspect(take, secrets) {
   return hits;
 }
 
-// The secrets to scan for, held in memory only. Each source must yield a value: a scan missing one
-// would pass a video that shows it. readSecret(ns, name, key) returns "" when it cannot read.
-export function loadSecrets({ passwordFile, kubeadminFile, stateFile, labNs }, readSecret) {
+// The secrets to scan for, held in memory only: the user's password files, the Keycloak admin
+// password, every Secret in secretRefs ([ns, name, key]) and the session cookies. Each source must
+// yield a value: a scan missing one would pass a video that shows it. readSecret returns "" on failure.
+export function loadSecrets({ passwordFile, kubeadminFile, stateFile, secretRefs = [] }, readSecret) {
   const read = (f, what) => {
     const v = f && fs.existsSync(f) ? fs.readFileSync(f, "utf8").trim() : "";
     if (!v) throw new Error(`cannot load ${what} to scan for (${f || "not set"})`);
@@ -212,7 +213,7 @@ export function loadSecrets({ passwordFile, kubeadminFile, stateFile, labNs }, r
   };
   const out = [read(passwordFile, "the user's password")];
   if (kubeadminFile) out.push(read(kubeadminFile, "the kubeadmin password"));
-  for (const [ns, name, key] of [[labNs, "maas-judge", "api-key"], ["keycloak", "keycloak-initial-admin", "password"]]) {
+  for (const [ns, name, key] of [["keycloak", "keycloak-initial-admin", "password"], ...secretRefs]) {
     const v = readSecret(ns, name, key);
     if (!v) throw new Error(`cannot load Secret ${ns}/${name} to scan for (oc login as cluster-admin?)`);
     out.push(v);
@@ -273,16 +274,39 @@ export async function waitPrompt(page, timeout = 600000, settle = 1500) {
   throw new Error("terminal did not return to a prompt");
 }
 
+// Answers an interactive prompt (read -p) once it is on screen; typed, so read -s keeps it off screen.
+export async function answerPrompt(page, prompt, text, timeout = 30000) {
+  const end = Date.now() + timeout;
+  // the prompt is the last row on screen (the pasted command above it contains the same words)
+  const lastRow = async () => (await termText(page)).split("\n").filter((l) => l.trim()).at(-1) || "";
+  while (!new RegExp(prompt).test(await lastRow())) {
+    if (Date.now() > end) throw new Error(`prompt not shown: ${prompt}`);
+    await sleep(300);
+  }
+  await sleep(700);
+  if (text) await page.keyboard.type(text, { delay: 25 });
+  await page.keyboard.press("Enter");
+}
+
 // Pastes the block the way a participant does (a clipboard paste: bash holds it, bracketed, until
 // Enter), then presses Enter.
 export async function typeBlock(page, block) {
-  await page.evaluate((text) => {
+  const paste = () => page.evaluate((text) => {
     const ta = [...document.querySelectorAll(".jp-Terminal .xterm-helper-textarea")].filter((t) => t.closest(".jp-Terminal").offsetParent).pop();
     ta.focus();
     const dt = new DataTransfer();
     dt.setData("text/plain", text);
     ta.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
   }, block);
+  // the screen changing confirms the paste landed (a long block scrolls its first line away at once);
+  // xterm can drop a paste while it is busy, so try once more, but never paste twice into a live screen
+  const before = await termText(page);
+  const changed = async (ms) => {
+    for (const end = Date.now() + ms; Date.now() < end; await sleep(200)) if ((await termText(page)) !== before) return true;
+    return false;
+  };
+  await paste();
+  if (!(await changed(4000))) { await paste(); if (!(await changed(4000))) throw new Error("paste did not reach the terminal"); }
   await sleep(600);
   await page.keyboard.press("Enter");
 }
@@ -303,6 +327,7 @@ export async function waitFast(take, done, { after = 4000, speed = 12, why = "wa
 }
 
 export async function runBlock(take, page, block, opts = {}) {
+  if (take.clearBoxes) await take.clearBoxes();  // old highlights would drift onto scrolled text
   await typeBlock(page, block);
   await sleep(800);
   let prev = "", since = Date.now();
@@ -343,6 +368,7 @@ export async function sectionCells(page, heading) {
 
 // Runs one code cell (index into the notebook's cells), speeding up long runs; fails on a traceback.
 export async function runCell(take, page, i, opts = {}) {
+  if (take.clearBoxes) await take.clearBoxes();
   const c = notebookCells(page).nth(i);
   await c.scrollIntoViewIfNeeded();
   await c.locator(".jp-InputArea-editor").click();

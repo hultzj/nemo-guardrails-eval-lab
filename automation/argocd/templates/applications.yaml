@@ -75,7 +75,6 @@ spec:
         safetyModel: {{- toYaml $.Values.safetyModel | nindent 10 }}
         images: {{- toYaml $.Values.images | nindent 10 }}
         workbench: {{- toYaml $.Values.workbench | nindent 10 }}
-        judge: {{- toYaml $.Values.judge | nindent 10 }}
         gitops:
           repoUrl: {{ $.Values.gitops.repoUrl | quote }}
           revision: {{ $.Values.gitops.revision | quote }}
@@ -91,6 +90,10 @@ spec:
     - group: kubeflow.org
       kind: Notebook
       jsonPointers: [/spec/template/spec, /metadata/annotations, /metadata/labels, /metadata/finalizers]
+    # Module 5: each participant writes their own judge API key into this Secret; keep it.
+    - kind: Secret
+      name: judge-api-key
+      jsonPointers: [/data]
   {{- end }}
   destination:
     server: https://kubernetes.default.svc

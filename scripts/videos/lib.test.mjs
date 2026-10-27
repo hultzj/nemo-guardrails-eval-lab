@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { MAX_SECONDS, TAIL, Take, block, captureDebug, encode, fitSpeeds, guideBlocks, inspect, loadSecrets, produce,
-  scan, segments, waitFast, withWorkDir, writeDebug } from "./lib.mjs";
+  scan, segments, waitFast, withWorkDir, writeDebug, answerPrompt } from "./lib.mjs";
 import { OUTPUTS, ROWS, show } from "./steps.mjs";
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
@@ -100,10 +100,12 @@ test("loadSecrets: every source must load, or recording stops", () => {
   const pw = path.join(dir, "pw");
   fs.writeFileSync(pw, "userpass\n");
   const reader = (ok) => (ns, name) => (ok.includes(name) ? `value-of-${name}` : "");
-  assert.deepEqual(loadSecrets({ passwordFile: pw, labNs: "lab" }, reader(["maas-judge", "keycloak-initial-admin"])),
-    ["userpass", "value-of-maas-judge", "value-of-keycloak-initial-admin"]);
-  assert.throws(() => loadSecrets({ passwordFile: pw, labNs: "lab" }, reader(["keycloak-initial-admin"])), /maas-judge/);
-  assert.throws(() => loadSecrets({ passwordFile: path.join(dir, "missing"), labNs: "lab" }, reader(["maas-judge", "keycloak-initial-admin"])), /password/);
+  const refs = [["guardrails", "judge-key", "api-key"]];
+  assert.deepEqual(loadSecrets({ passwordFile: pw, secretRefs: refs }, reader(["judge-key", "keycloak-initial-admin"])),
+    ["userpass", "value-of-keycloak-initial-admin", "value-of-judge-key"]);
+  assert.throws(() => loadSecrets({ passwordFile: pw, secretRefs: refs }, reader(["keycloak-initial-admin"])), /judge-key/);
+  assert.throws(() => loadSecrets({ passwordFile: pw, secretRefs: refs }, reader(["judge-key"])), /keycloak-initial-admin/);
+  assert.throws(() => loadSecrets({ passwordFile: path.join(dir, "missing"), secretRefs: refs }, reader(["judge-key", "keycloak-initial-admin"])), /password/);
   fs.rmSync(dir, { recursive: true });
 });
 
@@ -245,6 +247,19 @@ test("OUTPUTS: pre-flight answers and the judge's numbers must be the ones the c
   assert.ok(m(OUTPUTS.judgeRow, "self-check-034701-41c9\tself-check\tallowed\t19\t2\t1\t28\t0\t0.90\t0.95"));
   assert.ok(m(OUTPUTS.judgeRow, "self-check-025455-cd59 self-check allowed 20 2 0 28 0 0.91 1.0"));
   assert.ok(!m(OUTPUTS.judgeRow, "self-check-001 self-check allowed 0 30 20 0 0 0.0 0.0 0.0 1.0"));
+});
+
+test("answerPrompt: waits for the prompt as the last row, and never types into a missing one", async () => {
+  const typed = [];
+  let rows = "[user@wb ~]$ read -rp \"API key (not shown): \" K";  // the pasted command, not the prompt
+  const page = { evaluate: async () => rows, keyboard: { type: async (t) => typed.push(t), press: async (k) => typed.push(k) } };
+  setTimeout(() => { rows += "\nAPI key (not shown):"; }, 300);
+  await answerPrompt(page, "^API key \\(not shown\\):$", "s3cret", 3000);
+  assert.deepEqual(typed, ["s3cret", "Enter"]);
+  typed.length = 0;
+  rows = "[user@wb ~]$ something else";
+  await assert.rejects(answerPrompt(page, "^Model \\[.*\\]:$", "x", 500), /prompt not shown/);
+  assert.deepEqual(typed, [], "nothing typed when the prompt never appeared");
 });
 
 test("show: a highlight whose target is not on screen fails the step", async () => {

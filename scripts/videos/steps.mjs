@@ -54,6 +54,12 @@ async function workbench(take, cfg, { monitor = false, terminal = true } = {}) {
     take.cam("lab");
   }
   if (terminal) {
+    // earlier takes' terminal sessions keep running server-side; a few dozen stop new ones opening
+    await lab.evaluate(async (base) => {
+      const xsrf = (document.cookie.match(/_xsrf=([^;]+)/) || [])[1] || "";
+      const terms = await (await fetch(`${base}/api/terminals`)).json();
+      for (const t of terms) await fetch(`${base}/api/terminals/${t.name}`, { method: "DELETE", headers: { "X-XSRFToken": xsrf } });
+    }, new URL(cfg.lab).pathname);
     await hideSidebar(lab);  // before the terminal opens: a resize afterwards leaves its text rows stale
     await L.openTerminal(take, lab);
     await L.typeBlock(lab, prelude(cfg));
@@ -403,18 +409,31 @@ export const STEPS = {
   "m5-ex1": async (take, cfg) => {
     const { lab } = await workbench(take, cfg);
     await intro(take, "Module 5 · Exercise 1 — Wire the judge in",
-      "Write <code>self-check</code>: NeMo's <b>self check input</b> rail, judged by a remote LLM through the lab's judge proxy.");
+      "Bring your own API URL, model and API key, prove them on the endpoint, and wire them into <code>self-check</code>.");
+    await take.caption("Your credentials", "Enter accepts the suggested URL and model; the key is typed but never shown.");
+    await L.typeBlock(lab, L.block(cfg.www, M5, "read -rp \"API URL"));
+    await L.answerPrompt(lab, "^API URL \\[.*\\]:$", "");
+    await L.answerPrompt(lab, "^Model \\[.*\\]:$", "");
+    await L.answerPrompt(lab, "^API key \\(not shown\\):$", cfg.judgeKey);
+    await L.waitPrompt(lab);
+    await take.snapshot();
+    await take.caption("Run", "The portal's Hello, world! request with your three values, then the key into your project's Secret");
+    await L.runBlock(take, lab, L.block(cfg.www, M5, "set data secret/judge-api-key"), { why: "the judge's first answer" });
+    await show(take, [
+      { term: "^judge: .* key of [0-9]+ characters$", label: "Your URL and model; only the key's length is shown", kind: "info" },
+      { term: '"accepted":true', label: "The endpoint accepts your key and model", kind: "ok" },
+      { term: "^secret/judge-api-key data updated$", label: "Key stored where only you and your server can read it", hold: 2800 },
+    ]);
     await L.runBlock(take, lab, L.block(cfg.www, M5, "name: self-check\n"), { why: "the operator to roll the server" });
     await show(take, [
-      { term: "^judge: ", label: "The judge proxy and model from lab-judge", kind: "info" },
-      { term: "api_key: none", label: "No key in your project: the proxy holds it", hold: 2800 },
+      { term: "^nemoguardrails.* patched$", all: true, label: "Config added; key mapped in from judge-api-key", kind: "info" },
       { term: '\\{"id":"self-check"\\}\\]', last: true, label: "Server lists self-check", kind: "ok" },
     ]);
     await notebook(take, lab, cfg, "05-llm-judge.ipynb");
     take.normal();
     await L.runSection(take, lab, "1. Setup", { why: "the kernel to start" });
     await show(take, [{ sel: ".jp-OutputArea-output", re: "guardrails configs: .*'self-check'", last: true, label: "The notebook sees self-check", kind: "ok" }]);
-    await outcome(take, "A remote LLM is your third judge, and its API key never entered your project.");
+    await outcome(take, "A remote LLM is your third judge, with your own key in a Secret only you and your server can read.");
   },
 
   "m5-ex2": async (take, cfg) => {
@@ -480,6 +499,7 @@ export const STEPS = {
     await L.runBlock(take, lab, L.block(cfg.www, "90-cleanup", "delete nemoguardrails"), { why: "the operator to remove the server" });
     await show(take, [
       { term: "deleted", all: true, label: "Deleted", kind: "ok", hold: 2600 },
+      { term: "judge-api-key (data updated|was not changed)$", label: "Your API key blanked", kind: "ok", hold: 2400 },
       { term: "rails-monitor", all: true, label: "Only the lab's monitor remains", kind: "info", hold: 2600 },
     ]);
     await outcome(take, "Your project is back to what the lab deployed.");

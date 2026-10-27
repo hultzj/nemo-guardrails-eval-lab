@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "LLM as the judge: self check input through the judge proxy",
+    "title": "LLM as the judge: self check input with your own API key",
     "quality_profile": "showcase"
   },
   "components": [
@@ -54,26 +54,25 @@
       "label": "NeMo Guardrails",
       "sublabel": "config self-check",
       "pos": [
-        720,
+        760,
         240
       ],
       "size": [
         150,
         64
-      ],
-      "tag": "api_key: none"
+      ]
     },
     {
       "id": "config",
       "type": "database",
       "label": "ConfigMap self-check",
-      "sublabel": "policy prompt",
+      "sublabel": "your URL \u00b7 model \u00b7 policy",
       "pos": [
-        720,
+        755,
         60
       ],
       "size": [
-        150,
+        160,
         64
       ]
     },
@@ -83,8 +82,8 @@
       "label": "self check input",
       "sublabel": "first two words: yes/no",
       "pos": [
-        720,
-        410
+        760,
+        420
       ],
       "size": [
         150,
@@ -92,63 +91,35 @@
       ]
     },
     {
-      "id": "proxy",
-      "type": "security",
-      "label": "judge-proxy",
-      "sublabel": "adds key \u00b7 pins model",
-      "pos": [
-        960,
-        410
-      ],
-      "size": [
-        140,
-        64
-      ]
-    },
-    {
       "id": "secret",
       "type": "database",
-      "label": "Secret maas-judge",
-      "sublabel": "make judge-secret",
+      "label": "Secret judge-api-key",
+      "sublabel": "your API key",
       "pos": [
-        960,
-        560
+        480,
+        420
       ],
       "size": [
-        140,
+        160,
         64
       ]
     },
     {
       "id": "maas",
       "type": "external",
-      "label": "Model as a Service",
-      "sublabel": "deepseek-r1-distill-qwen-14b",
+      "label": "Model endpoint",
+      "sublabel": "your API URL + model",
       "pos": [
-        1170,
-        410
+        1060,
+        420
       ],
       "size": [
-        170,
+        160,
         64
       ]
     }
   ],
   "boundaries": [
-    {
-      "kind": "region",
-      "label": "OpenShift AI cluster",
-      "wraps": [
-        "client",
-        "monitor",
-        "rbac",
-        "nemo",
-        "config",
-        "rail",
-        "proxy",
-        "secret"
-      ]
-    },
     {
       "kind": "security-group",
       "label": "Your project: <user>-guardrails",
@@ -158,14 +129,7 @@
         "rbac",
         "nemo",
         "config",
-        "rail"
-      ]
-    },
-    {
-      "kind": "security-group",
-      "label": "guardrails-lab-shared: lab only",
-      "wraps": [
-        "proxy",
+        "rail",
         "secret"
       ]
     }
@@ -212,26 +176,17 @@
       "labelDy": 24
     },
     {
-      "id": "call-proxy",
-      "from": "rail",
-      "to": "proxy",
-      "label": "no key",
-      "variant": "emphasis"
-    },
-    {
       "id": "read-key",
       "from": "secret",
-      "to": "proxy",
-      "label": "mounted",
-      "variant": "security",
-      "fromSide": "top",
-      "toSide": "bottom"
+      "to": "rail",
+      "label": "OPENAI_API_KEY",
+      "variant": "security"
     },
     {
-      "id": "call-maas",
-      "from": "proxy",
+      "id": "call-model",
+      "from": "rail",
       "to": "maas",
-      "label": "Bearer key",
+      "label": "Bearer your key",
       "variant": "security"
     }
   ],
@@ -249,8 +204,8 @@
       "dot": "rose",
       "title": "Control boundaries",
       "items": [
-        "The key exists only in the lab namespace",
-        "Your config can redirect a call, never steal a key"
+        "Your key: in your project, read by you and your server",
+        "Every screened prompt leaves the cluster"
       ]
     },
     {

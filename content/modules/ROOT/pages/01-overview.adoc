@@ -29,7 +29,7 @@
 | Classifies a prompt as safe or unsafe against 23 categories (violence, criminal planning, PII/privacy and others) and names the categories.
 
 | LLM judge (remote)
-| A general-purpose reasoning model, `deepseek-r1-distill-qwen-14b`, on the workshop's Model-as-a-Service endpoint, reached through the shared judge proxy in `{lab_namespace}`, which alone holds the API key
+| A general-purpose reasoning model, `deepseek-r1-distill-qwen-14b`, on the workshop's Model-as-a-Service endpoint (or any OpenAI-compatible endpoint you have a key for); you bring the API URL, model and your own API key
 | Answers NeMo's `self check input` rail: should this message be blocked under the policy in your prompt?
 
 | Live monitor
@@ -48,7 +48,7 @@
 No request generates an answer. Every request asks only for the input rails' verdict, so a
 blocked prompt gets a refusal and an allowed prompt is echoed back unchanged; that keeps every
 measurement about the guardrails alone. Only Module 5 configures an LLM, and only as the judge,
-with an API key you never see.
+with the API URL, model and API key you bring.
 
 == The one distinction to understand: a pattern rail versus a model rail
 
@@ -83,15 +83,14 @@ xref:attachment$guardrails-deterministic.html[Open the interactive diagram,windo
 
 === LLM as the judge: the decision leaves the cluster
 
-image::guardrails-llm-judge.png["LLM as the judge: the NeMo Guardrails server's self check input rail sends the policy prompt and message, with no key, to the judge-proxy in guardrails-lab-shared, which adds the key from Secret maas-judge and calls the Model-as-a-Service endpoint",width=100%,xref=attachment$guardrails-llm-judge.html,window=_blank]
+image::guardrails-llm-judge.png["LLM as the judge: the NeMo Guardrails server's self check input rail sends the policy prompt and message, with your API key from Secret judge-api-key in your project, to the Model-as-a-Service endpoint",width=100%,xref=attachment$guardrails-llm-judge.html,window=_blank]
 
 The `self-check` configuration (Module 5) sends your policy prompt and the message to a
-general-purpose LLM. Your server holds no key (`api_key: none`): it calls the lab's
-`judge-proxy` in `{lab_namespace}`, which alone reads Secret `maas-judge`, pins the model and
-forwards the call to the Model-as-a-Service endpoint. NeMo then reads the first two words of the
-judge's answer: *no* allows, anything else blocks. A verdict takes seconds and can differ from
-run to run. Because you write the configuration, you decide where your server sends requests;
-keeping the key in the lab namespace means a redirected call carries nothing worth stealing.
+general-purpose LLM at the API URL and model you chose, with your own API key. The key sits in
+the Secret `judge-api-key` in your project, which only you and your server can read; the
+`NemoGuardrails` resource hands it to the server as `OPENAI_API_KEY`. NeMo then reads the first
+two words of the judge's answer: *no* allows, anything else blocks. A verdict takes seconds and can
+differ from run to run, and it leaves the cluster: every prompt you screen goes to that endpoint.
 xref:attachment$guardrails-llm-judge.html[Open the interactive diagram,window=_blank] (zoom, focus, dark mode).
 
 == Lab progression

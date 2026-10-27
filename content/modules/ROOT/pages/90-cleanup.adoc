@@ -7,8 +7,9 @@
 video::cleanup.mp4[width=100%]
 
 You created a `NemoGuardrails` resource and five rail ConfigMaps. Look at them first, then
-delete them, from your workbench terminal. The workbench, its files (the cloned lab and your
-notebook results), the live monitor and your project belong to the lab and stay.
+delete them, from your workbench terminal, and blank the API key you stored in Module 5. The
+workbench, its files (the cloned lab and your notebook results), the live monitor, the (now empty)
+`judge-api-key` Secret and your project belong to the lab and stay.
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -31,11 +32,14 @@ The next block deletes them. Your workbench keeps running: the lab owns it.
 ----
 oc -n $NS delete nemoguardrails nemoguardrails --ignore-not-found --wait=true
 oc -n $NS delete configmap regex-only content-safety tuned self-check self-check-edited --ignore-not-found
+oc -n $NS set data secret/judge-api-key api-key=
 oc -n $NS get deploy,route -o name
 ----
 
 Expected result: one `deleted` line for each resource you created (`nemoguardrails`,
-`regex-only`, `content-safety`, `tuned`, and from Module 5 `self-check` and `self-check-edited`), and the last command lists only `deployment.apps/rails-monitor` and
+`regex-only`, `content-safety`, `tuned`, and from Module 5 `self-check` and `self-check-edited`),
+`secret/judge-api-key data updated` (your key is gone; `info: judge-api-key was not changed` if you
+never stored one), and the last command lists only `deployment.apps/rails-monitor` and
 `route.route.openshift.io/rails-monitor`: the operator removed the guardrails Deployment, Service
 and Route with the resource. (The workbench runs as a StatefulSet, so it is not in this list.)
 

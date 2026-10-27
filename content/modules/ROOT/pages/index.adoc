@@ -63,7 +63,7 @@ terminal; every command in Modules 1 to 4 shows up on it within a second, and in
 | 25 min
 
 | 5. An LLM as the judge
-| A remote LLM wired in as a `self check input` judge through a proxy that keeps its API key out of your project; a silent parsing failure found and fixed; three judges compared; a policy edit measured against the judge's noise
+| A remote LLM wired in as a `self check input` judge with your own API URL, model and key; a silent parsing failure found and fixed; three judges compared; a policy edit measured against the judge's noise
 | 30 min
 |===
 

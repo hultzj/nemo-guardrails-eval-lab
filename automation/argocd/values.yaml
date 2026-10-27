@@ -23,13 +23,6 @@ lab:
   # Facilitator-owned tenant: the deterministic target of the cross-tenant denial check.
   decoyTenant: peer-demo
 
-# Module 5's LLM judge: the OpenAI-compatible endpoint and model the shared judge proxy forwards to
-# (non-secret). The API key is never in git, and never in a tenant namespace: `make -C automation
-# judge-secret` creates Secret maas-judge (key api-key) in lab.namespace, where only the proxy reads it.
-judge:
-  baseUrl: https://maas-rhdp.apps.maas.redhatworkshops.io/v1
-  model: openai/deepseek-r1-distill-qwen-14b
-
 # false for a participant-built lab with no components.
 prereqs:
   enabled: true

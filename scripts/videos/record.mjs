@@ -2,6 +2,7 @@
 // Usage: node record.mjs list | all | <step> [...]
 // Env: DOMAIN, LAB_USER (default user1), STATE (session from login.mjs), LAB_PASSWORD_FILE (and
 // optionally KUBEADMIN_PASSWORD_FILE) to scan for, with Secrets read through the caller's oc login;
+// JUDGE_KEY_SECRET (namespace/secret/key: the judge API key Module 5 types in);
 // OUT (default: the guide's images directory); DEBUG_DIR (failure screenshots, outside the repo).
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -26,8 +27,12 @@ const readSecret = (secretNs, name, key) => {
     return Buffer.from(b64, "base64").toString().trim();
   } catch { return ""; }
 };
+// Module 5's participant brings an API key: the recording types one from JUDGE_KEY_SECRET
+// (namespace/name/key, read with the caller's oc login) into the hidden prompt, and scans for it.
+const judgeRef = (process.env.JUDGE_KEY_SECRET || "").split("/");
+if (judgeRef.length !== 3) throw new Error("JUDGE_KEY_SECRET=<namespace>/<secret>/<key> is required (the judge API key Module 5 types in)");
 const secrets = loadSecrets({ passwordFile: process.env.LAB_PASSWORD_FILE, kubeadminFile: process.env.KUBEADMIN_PASSWORD_FILE,
-  stateFile: process.env.STATE, labNs: process.env.LAB_NS || "guardrails-lab-shared" }, readSecret);
+  stateFile: process.env.STATE, secretRefs: [judgeRef] }, readSecret);
 
 const cfg = {
   user, ns, domain,
@@ -35,6 +40,7 @@ const cfg = {
   lab: `https://rh-ai.${domain}/notebook/${ns}/guardrails-lab`,
   monitor: `https://rails-monitor-${ns}.${domain}`,
   www: path.join(repo, "www/modules"),
+  judgeKey: readSecret(...judgeRef),  // typed into a read -s prompt only; never shown
 };
 
 const { chromium } = await import("playwright");
