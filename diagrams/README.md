@@ -1,10 +1,14 @@
 # Architecture diagrams
 
-Sources for the two diagrams on the *Architecture and Control Boundaries* page, written for the
-[Archify](https://github.com/tt-a1i/archify) skill. Each produces an interactive HTML (an Antora
-attachment, linked from the page) and a PNG of its diagram panel (embedded in the page).
+Sources written for the [Archify](https://github.com/tt-a1i/archify) skill. Each produces an
+interactive HTML and a PNG of its diagram panel:
 
-After editing a source, from the Archify skill directory:
+* `guardrails-deterministic` and `guardrails-llm-judge` (architecture): the *Architecture and Control
+  Boundaries* page, as Antora attachments (`content/modules/ROOT/attachments/`) and images.
+* `live-monitor-flow` (sequence): the repository README, in `docs/` (`docs/images/` for the PNG).
+
+After editing a source, from the Archify skill directory (use `sequence` and the `docs/` paths for
+`live-monitor-flow`):
 
 ```bash
 node bin/archify.mjs validate architecture <repo>/diagrams/<name>.architecture.json --quality showcase --json

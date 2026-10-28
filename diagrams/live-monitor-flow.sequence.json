@@ -1,0 +1,206 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Live monitor: one request, and the live view",
+    "viewBox": [
+      1080,
+      600
+    ],
+    "column_fit": "spread",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    {
+      "id": "notebook",
+      "type": "external",
+      "label": "Notebook / ask",
+      "sublabel": "your token"
+    },
+    {
+      "id": "browser",
+      "type": "frontend",
+      "label": "Browser",
+      "sublabel": "monitor page"
+    },
+    {
+      "id": "oauth",
+      "type": "security",
+      "label": "oauth-proxy",
+      "sublabel": "sidecar :8443"
+    },
+    {
+      "id": "monitor",
+      "type": "backend",
+      "label": "monitor.py",
+      "sublabel": "127.0.0.1:8080"
+    },
+    {
+      "id": "rbac",
+      "type": "security",
+      "label": "kube-rbac-proxy",
+      "sublabel": "guardrails sidecar"
+    },
+    {
+      "id": "nemo",
+      "type": "backend",
+      "label": "NeMo Guardrails",
+      "sublabel": "runs the rails"
+    },
+    {
+      "id": "k8s",
+      "type": "cloud",
+      "label": "Kubernetes API",
+      "sublabel": "pod log"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 355,
+      "label": "One request"
+    },
+    {
+      "from": 368,
+      "to": 520,
+      "label": "Live view"
+    }
+  ],
+  "messages": [
+    {
+      "id": "send",
+      "from": "notebook",
+      "to": "oauth",
+      "y": 165,
+      "label": "POST /v1/chat/completions",
+      "variant": "emphasis"
+    },
+    {
+      "id": "admit",
+      "from": "oauth",
+      "to": "monitor",
+      "y": 195,
+      "label": "your token may get services",
+      "variant": "security"
+    },
+    {
+      "id": "forward",
+      "from": "monitor",
+      "to": "rbac",
+      "y": 225,
+      "label": "request + verdict options, monitor's token",
+      "variant": "security"
+    },
+    {
+      "id": "pass",
+      "from": "rbac",
+      "to": "nemo",
+      "y": 255,
+      "label": "allowed",
+      "variant": "default"
+    },
+    {
+      "id": "verdict",
+      "from": "nemo",
+      "to": "monitor",
+      "y": 285,
+      "label": "verdict, rail, categories",
+      "variant": "return"
+    },
+    {
+      "id": "answer",
+      "from": "monitor",
+      "to": "oauth",
+      "y": 315,
+      "label": "answer, unchanged",
+      "variant": "return"
+    },
+    {
+      "id": "answer-out",
+      "from": "oauth",
+      "to": "notebook",
+      "y": 345,
+      "label": "answer",
+      "variant": "return"
+    },
+    {
+      "id": "open",
+      "from": "browser",
+      "to": "oauth",
+      "y": 385,
+      "label": "GET /events (OpenShift login)",
+      "variant": "security"
+    },
+    {
+      "id": "decisions",
+      "from": "monitor",
+      "to": "browser",
+      "y": 415,
+      "label": "decisions + run tallies (SSE)",
+      "variant": "dashed"
+    },
+    {
+      "id": "follow",
+      "from": "monitor",
+      "to": "k8s",
+      "y": 445,
+      "label": "follow the guardrails pod log",
+      "variant": "dashed"
+    },
+    {
+      "id": "lines",
+      "from": "k8s",
+      "to": "monitor",
+      "y": 475,
+      "label": "log lines",
+      "variant": "return"
+    },
+    {
+      "id": "stream",
+      "from": "monitor",
+      "to": "browser",
+      "y": 505,
+      "label": "log lines (SSE)",
+      "variant": "dashed"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "monitor",
+      "from": 190,
+      "to": 511,
+      "type": "backend"
+    },
+    {
+      "participant": "nemo",
+      "from": 250,
+      "to": 291,
+      "type": "backend"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "Two checks",
+      "items": [
+        "oauth-proxy admits only callers who may get services in the project",
+        "kube-rbac-proxy then checks the monitor's own token"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "What it keeps",
+      "items": [
+        "The last 300 decisions and every run, in memory",
+        "Run tallies come from the notebooks' X-Eval headers"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Built by",
+      "items": [
+        "The tenants chart, one per project, synced by Argo CD"
+      ]
+    }
+  ]
+}

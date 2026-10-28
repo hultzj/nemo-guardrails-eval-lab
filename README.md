@@ -59,6 +59,64 @@ CD Application that deploys, and keeps in sync:
 
 Participants create their own guardrails servers and rail configurations during the modules.
 
+## How the live monitor works
+
+The live monitor is this lab's own code, not an OpenShift or NeMo component: about 240 lines of
+Python (standard library only) in
+[`monitor.py`](automation/argocd/components/tenants/files/monitor.py) and a single page,
+[`index.html`](automation/argocd/components/tenants/files/index.html), behind OpenShift's stock
+oauth-proxy.
+
+![Live monitor request flow: the notebook calls oauth-proxy, which checks the caller's token; monitor.py forwards the request with its own ServiceAccount token through kube-rbac-proxy to NeMo Guardrails, records the verdict, returns the answer unchanged, and streams decisions and the guardrails pod log to the browser](docs/images/live-monitor-flow.png)
+
+([Interactive version](docs/live-monitor-flow.html): download it and open it in a browser.)
+
+**When it is built.** `make bootstrap` creates the parent Argo CD Application, which renders the
+tenants chart ([`tenants.yaml`](automation/argocd/components/tenants/templates/tenants.yaml)) once
+per user in `lab.users`, after the safety model. Every `<user>-guardrails` project therefore has
+its monitor before the participant logs in. The pod template carries a checksum of `monitor.py` and
+`index.html`, so pushing a change to either rolls the monitor in every project.
+
+**What each project gets.**
+
+| Resource | Purpose |
+|---|---|
+| ConfigMap `rails-monitor-app` | `monitor.py` and `index.html` from the chart's `files/`, mounted at `/app` |
+| Deployment `rails-monitor` | one pod: an init container that generates a random session-cookie key (no secret in git); the `monitor` container (`python3 /app/monitor.py`, UBI Python image, listening only on `127.0.0.1:8080`); and the `oauth-proxy` sidecar on `:8443` |
+| ServiceAccount `rails-monitor` | the pod's identity, also registered as oauth-proxy's OAuth client for the Route |
+| Role and RoleBinding | read pods and pod logs and `get services` in its own project only |
+| ClusterRoleBinding (`system:auth-delegator`) | lets oauth-proxy ask the API server whether a caller's token is allowed |
+| Service `rails-monitor` (8443) | with an OpenShift serving certificate, so in-cluster callers use verified TLS |
+| Route `rails-monitor` | `https://rails-monitor-<user>-guardrails.<apps domain>`, re-encrypted |
+
+**How a request flows.**
+
+1. A notebook (`labeval.py`) or the guide's `ask` helper sends `POST /v1/chat/completions` to the
+   monitor instead of the guardrails server.
+2. oauth-proxy admits the request only if the caller's token may `get services` in that project;
+   another participant's token is refused. In a browser it runs the OpenShift login instead.
+3. `monitor.py` forwards the request to the guardrails Service with its own ServiceAccount token
+   (asking, for chat requests, for the verdict details); kube-rbac-proxy in front of the guardrails
+   server checks that token the same way.
+4. The answer goes back to the caller unchanged. The monitor classifies it as allowed, blocked
+   (with the rail and categories) or error (no verdict), keeps it in memory and pushes it to every
+   open browser over Server-Sent Events (`/events`).
+5. If the request carries `X-Eval-Run`, `X-Eval-Label` and `X-Eval-Total` headers (the notebooks
+   send them), the monitor also tallies TP/FP/FN/TN for that run; the notebooks read the tallies
+   back from `/api/runs` to cross-check their own numbers.
+6. A background thread finds the guardrails pod through the Kubernetes API and streams its log to
+   the page, picking up the new pod after every rollout.
+
+**Limits.** State is in memory: the last 300 decisions, the last 60 log lines and every run. A
+restart or rollout clears it. The monitor sees only requests sent through it; calling the
+guardrails Route directly (as Module 1, Exercise 3 and Module 2, Exercise 4 do on purpose)
+bypasses it.
+
+**Code and tests.** [`automation/tests/test_monitor.py`](automation/tests/test_monitor.py) runs the
+real handler against a stub guardrails server and a stub Kubernetes API. To look at a running
+monitor: `oc -n <user>-guardrails get deploy,svc,route rails-monitor` and
+`oc -n <user>-guardrails logs deploy/rails-monitor -c monitor`.
+
 ## Deploy
 
 From a checkout of this repository, logged in to the cluster as cluster-admin:
@@ -104,6 +162,7 @@ day of class; `make -C automation teardown` removes the lab and every namespace 
 | `notebooks/` | the evaluation notebooks, `labeval.py` and the 50-prompt `dataset.jsonl` |
 | `automation/` | the Argo CD chart (`argocd/`), `make` targets, `create-users.sh`, `verify.sh`, tests |
 | `diagrams/` | sources of the architecture diagrams ([how to regenerate](diagrams/README.md)) |
+| `docs/` | the live monitor flow diagram for this README (interactive HTML and PNG) |
 | `scripts/check-lab.sh` | the guide's contract: every runnable step has a verified expected result |
 | `scripts/videos/` | the recorder for the step videos ([how to re-record](scripts/videos/README.md)) |
 
